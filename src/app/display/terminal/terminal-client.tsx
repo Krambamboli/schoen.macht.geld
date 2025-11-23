@@ -57,7 +57,7 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
 
   useEffect(() => {
     fetchHeadline(); // Initial fetch
-    const interval = setInterval(fetchHeadline, 20000); // Generate a new headline every 20s
+    const interval = setInterval(fetchHeadline, 90000); // Generate a new headline every 90s
     return () => clearInterval(interval);
   }, [fetchHeadline]);
 
@@ -93,7 +93,7 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
           to { transform: translateX(-50%); }
         }
         .animate-marquee-fast {
-          animation: marquee-fast 30s linear infinite;
+          animation: marquee-fast 45s linear infinite;
         }
       `}</style>
     </div>
