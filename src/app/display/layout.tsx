@@ -2,7 +2,7 @@
 
 import { Logo } from '@/components/icons';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart2, CandlestickChart, Tv2 } from 'lucide-react';
+import { BarChart2, CandlestickChart, TrendingUp, Tv2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -20,6 +20,7 @@ export default function DisplayLayout({
     { id: 'ticker', label: 'Stock Ticker', href: '/display', icon: CandlestickChart },
     { id: 'market-map', label: 'Market Map', href: '/display/market-map', icon: BarChart2 },
     { id: 'terminal', label: 'Bloomberg Terminal', href: '/display/terminal', icon: Tv2 },
+    { id: 'leaderboard', label: 'Leaderboard', href: '/display/leaderboard', icon: TrendingUp },
   ];
 
   return (
