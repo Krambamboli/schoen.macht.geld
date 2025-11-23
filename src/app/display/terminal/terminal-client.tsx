@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/table';
 import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
 
 type StockWithChange = Stock & { change: number; percentChange: number };
 
@@ -68,16 +69,20 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
   return (
     <div className="w-full bg-red-700 text-white h-10 flex items-center overflow-hidden">
       <div className="flex animate-marquee-fast whitespace-nowrap">
-        <p className="text-xl font-bold mx-12">{headline}</p>
-        <p className="text-xl font-bold mx-12">{headline}</p>
+        <span className="text-xl font-bold px-12">{headline}</span>
+        <span className="text-xl font-bold px-12">{headline}</span>
       </div>
        <style jsx>{`
         @keyframes marquee-fast {
-            0% { transform: translateX(0%); }
-            100% { transform: translateX(-50%); }
+            from { transform: translateX(0); }
+            to { transform: translateX(-100%); }
         }
         .animate-marquee-fast {
-            animation: marquee-fast 20s linear infinite;
+            display: inline-block;
+            animation: marquee-fast 30s linear infinite;
+        }
+        .animate-marquee-fast > span {
+          display: inline-block;
         }
       `}</style>
     </div>
@@ -86,6 +91,7 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 
 export default function TerminalClient() {
     const [stocks, setStocks] = useState<StockWithChange[]>([]);
+    const prevRanksRef = useRef<Map<string, number>>(new Map());
 
     useEffect(() => {
         const loadData = () => {
@@ -108,6 +114,29 @@ export default function TerminalClient() {
         };
     }, []);
 
+    const sortedStocks = stocks.sort((a, b) => b.value - a.value);
+
+    const currentRanks = new Map<string, number>();
+    sortedStocks.forEach((stock, index) => {
+        currentRanks.set(stock.id, index);
+    });
+
+    const getRankChange = (stockId: string, currentRank: number) => {
+      if (!prevRanksRef.current.has(stockId)) {
+          return 'same';
+      }
+      const prevRank = prevRanksRef.current.get(stockId)!;
+      if (currentRank < prevRank) return 'up';
+      if (currentRank > prevRank) return 'down';
+      return 'same';
+    };
+    
+    // Update previous ranks after render
+    useEffect(() => {
+      prevRanksRef.current = currentRanks;
+    });
+
+
   return (
     <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono">
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
@@ -117,6 +146,7 @@ export default function TerminalClient() {
         <Table>
           <TableHeader>
             <TableRow className="border-gray-700 hover:bg-gray-900">
+              <TableHead className="text-yellow-400 w-12"></TableHead>
               <TableHead className="text-yellow-400">TICKER</TableHead>
               <TableHead className="text-yellow-400">NICKNAME</TableHead>
               <TableHead className="text-yellow-400 text-right">VALUE</TableHead>
@@ -125,15 +155,29 @@ export default function TerminalClient() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {stocks
-              .sort((a, b) => b.value - a.value)
-              .map((stock) => {
+            {sortedStocks
+              .map((stock, index) => {
                 const isPositive = stock.change >= 0;
+                const rankChange = getRankChange(stock.id, index);
+
+                let RankIndicator;
+                switch(rankChange) {
+                    case 'up':
+                        RankIndicator = <ArrowUp className="w-4 h-4 text-green-400" />;
+                        break;
+                    case 'down':
+                        RankIndicator = <ArrowDown className="w-4 h-4 text-red-500" />;
+                        break;
+                    default:
+                        RankIndicator = <Minus className="w-4 h-4 text-gray-600" />;
+                }
+
                 return (
                   <TableRow
                     key={stock.id}
                     className="border-gray-800 hover:bg-gray-900/50"
                   >
+                    <TableCell className="w-12">{RankIndicator}</TableCell>
                     <TableCell className="font-bold">{stock.ticker}</TableCell>
                     <TableCell>{stock.nickname}</TableCell>
                     <TableCell
@@ -147,7 +191,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                        isPositive ? 'text-green-400' : 'text-red-500'
+                        stock.change === 0 ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
                       {stock.change > 0 ? '+' : ''}
@@ -156,7 +200,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                         isPositive ? 'text-green-400' : 'text-red-500'
+                         stock.percentChange === 0 ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
                       {stock.percentChange > 0 ? '+' : ''}

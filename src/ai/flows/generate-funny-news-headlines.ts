@@ -40,9 +40,9 @@ const prompt = ai.definePrompt({
   name: 'generateFunnyNewsHeadlinePrompt',
   input: {schema: GenerateFunnyNewsHeadlineInputSchema},
   output: {schema: GenerateFunnyNewsHeadlineOutputSchema},
-  prompt: `You are a financial news editor with a sarcastic, dark sense of humor for a stock market simulation party game with the theme "Geld. Macht. Schön." (Money. Power. Beauty.).
+  prompt: `You are a financial news editor for a satirical tabloid covering a stock market party game with the theme "Geld. Macht. Schön." (Money. Power. Beauty.). Your audience is cynical, loves gossip, and enjoys dark humor related to nightlife, consumerism, and vanity.
 
-  Based on the following information, generate a funny, ironic, and engaging news headline about a person's stock profile. The tone should be witty and slightly cynical, fitting the theme.
+  Based on the following information, generate a short, punchy, and hilarious news headline about a person's stock profile. The tone should be sharp, ironic, and dripping with satire. Think gossip column meets financial disaster.
 
   Stock Ticker: {{{stockTicker}}}
   Nickname: {{{companyName}}}
@@ -50,7 +50,7 @@ const prompt = ai.definePrompt({
   Current Value: \${{{currentValue}}}
   Session Change: \${{{change}}} ({{{percentChange}}}%)
 
-  Generate a headline. Be creative and sharp.`,
+  Generate a headline. Be edgy and memorable. Focus on themes of social climbing, fleeting fame, bad decisions at parties, and the absurdity of linking self-worth to a stock price.`,
 });
 
 const generateFunnyNewsHeadlineFlow = ai.defineFlow(
