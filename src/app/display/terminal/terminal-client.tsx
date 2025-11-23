@@ -14,7 +14,7 @@ import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useRef } from 'react';
 
-type StockWithChange = Stock & { change: number; percentChange: number; prevValue: number };
+type StockWithChange = Stock & { change: number; percentChange: number };
 
 const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
   const [headline, setHeadline] = useState(
@@ -97,28 +97,24 @@ export default function TerminalClient() {
                 let prevValue = previousValues.get(stock.id);
                 if (prevValue === undefined) {
                     prevValue = stock.value;
+                    previousValues.set(stock.id, stock.value)
                 }
-                
-                if (previousValues.get(stock.id) !== stock.value) {
-                    if (!previousValues.has(stock.id)) {
-                         previousValues.set(stock.id, stock.value);
-                    } else {
-                         previousValues.set(stock.id, stock.value);
-                    }
-                }
-
 
                 const change = stock.value - prevValue;
                 const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
 
                 return {
                     ...stock,
-                    prevValue: prevValue,
-                    change: change,
-                    percentChange: percentChange,
+                    change,
+                    percentChange,
                 };
             });
             setStocks(updatedStocks);
+
+            // After processing, update the ref for the *next* interval
+            stocksToDisplay.forEach(stock => {
+                previousValues.set(stock.id, stock.value);
+            });
         };
         
         loadData();
@@ -173,7 +169,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right font-bold',
-                        isPositive ? 'text-green-400' : 'text-red-500'
+                        stock.change !== 0 && (isPositive ? 'text-green-400' : 'text-red-500')
                       )}
                     >
                       ${stock.value.toFixed(2)}
@@ -181,19 +177,19 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                        isPositive ? 'text-green-400' : 'text-red-500'
+                        stock.change !== 0 && (isPositive ? 'text-green-400' : 'text-red-500')
                       )}
                     >
-                      {isPositive ? '+' : ''}
+                      {stock.change > 0 ? '+' : ''}
                       {stock.change.toFixed(2)}
                     </TableCell>
                     <TableCell
                       className={cn(
                         'text-right',
-                        isPositive ? 'text-green-400' : 'text-red-500'
+                         stock.change !== 0 && (isPositive ? 'text-green-400' : 'text-red-500')
                       )}
                     >
-                      {isPositive ? '+' : ''}
+                      {stock.percentChange > 0 ? '+' : ''}
                       {stock.percentChange.toFixed(2)}%
                     </TableCell>
                   </TableRow>

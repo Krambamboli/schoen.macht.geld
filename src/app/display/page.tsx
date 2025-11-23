@@ -34,8 +34,9 @@ const StockTicker = () => {
         );
     }
     
-    // Repeat the stocks to create a seamless loop
-    const repeatedStocks = [...stocks, ...stocks];
+    // Repeat the stocks to create a seamless loop, ensuring there are enough items for a smooth animation
+    const repeatedStocks = stocks.length > 0 ? Array(10).fill(stocks).flat() : [];
+
 
     return (
         <div className="w-full bg-gray-900 text-white h-full flex items-center overflow-hidden">
@@ -58,7 +59,8 @@ const StockTicker = () => {
                     100% { transform: translateX(-50%); }
                 }
                 .animate-marquee {
-                    animation: marquee ${stocks.length * 10}s linear infinite;
+                    animation: marquee ${stocks.length * 5}s linear infinite;
+                    min-width: 100%;
                 }
             `}</style>
         </div>

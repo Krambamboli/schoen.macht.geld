@@ -2,7 +2,7 @@
 
 import { mockStocks } from '@/lib/mock-data';
 import type { Stock } from '@/lib/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 
 type StockWithChange = Stock & { change: number; percentChange: number };
@@ -59,10 +59,9 @@ const CustomizedContent = (props: any) => {
 
 export default function MarketMapClient() {
   const [data, setData] = useState<StockWithChange[]>([]);
+  const previousValuesRef = useRef(new Map<string, number>());
 
   useEffect(() => {
-     const previousValues = new Map<string, number>();
-
      const loadData = () => {
         const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
         let stocksToDisplay: Stock[];
@@ -73,30 +72,37 @@ export default function MarketMapClient() {
         } else {
             stocksToDisplay = mockStocks;
         }
+        
+        const previousValues = previousValuesRef.current;
 
-        setData(prevData => {
-            return stocksToDisplay.map((stock: Stock) => {
-                let prevValue = previousValues.get(stock.id);
-                if (prevValue === undefined) {
-                  // If we don't have a previous value, use the current value to avoid a huge initial change
-                  prevValue = stock.value;
-                  previousValues.set(stock.id, stock.value);
-                }
+        const updatedData = stocksToDisplay.map((stock: Stock) => {
+            let prevValue = previousValues.get(stock.id);
+            
+            if (prevValue === undefined) {
+              prevValue = stock.value;
+              previousValues.set(stock.id, stock.value);
+            }
 
-                const change = stock.value - prevValue;
-                const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
-                
-                // Only update previous value if there was a change, but also set it initially
-                if (stock.value !== prevValue) {
-                    previousValues.set(stock.id, prevValue); // keep the old value for change calculation
-                }
+            const change = stock.value - prevValue;
+            const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
+            
+            // This was the bug: we need to update the ref with the *new* value
+            // if we want to calculate change against the last known value in the next interval.
+            // However, for the *current* render, we need the change from the previous state.
+            // The best approach is to only set the initial value and let the `value` prop drive size.
+            // The change calculation needs to be against the value from the *last poll*.
 
-                return { 
-                    ...stock, 
-                    change: change,
-                    percentChange: percentChange,
-                };
-            });
+            return { 
+                ...stock, 
+                change,
+                percentChange,
+            };
+        });
+        setData(updatedData);
+
+        // After processing, update the ref for the *next* interval
+        stocksToDisplay.forEach(stock => {
+            previousValues.set(stock.id, stock.value);
         });
     };
     
@@ -123,6 +129,16 @@ export default function MarketMapClient() {
             borderRadius: '0.5rem',
           }}
           labelStyle={{ color: 'white' }}
+          formatter={(value: number, name: string, props) => {
+              const { payload } = props;
+              const change = payload.change;
+              const percentChange = payload.percentChange;
+              const isPositive = change >= 0;
+              return [
+                  `$${(value as number).toFixed(2)}`,
+                  `${isPositive ? '+' : ''}${change.toFixed(2)} (${percentChange.toFixed(2)}%)`
+              ]
+          }}
         />
       </Treemap>
     </ResponsiveContainer>
