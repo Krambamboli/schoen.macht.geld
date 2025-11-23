@@ -12,7 +12,7 @@ import {
 import { mockStocks } from '@/lib/mock-data';
 import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 type StockWithChange = Stock & { change: number; percentChange: number; prevValue: number };
 
@@ -30,10 +30,10 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
       try {
         // Find a "trending" stock (e.g., biggest change)
         const trendingStock = [...stocks].sort(
-          (a, b) => Math.abs(b.change) - Math.abs(a.change)
+          (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
         )[0];
 
-        if (trendingStock) {
+        if (trendingStock && trendingStock.change !== 0) {
           const result = await generateFunnyNewsHeadline({
             stockTicker: trendingStock.ticker,
             companyName: trendingStock.nickname,
@@ -78,10 +78,9 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 export default function TerminalClient() {
     const [stocks, setStocks] = useState<StockWithChange[]>([]);
     const [time, setTime] = useState(new Date());
+    const previousValuesRef = useRef(new Map<string, number>());
 
     useEffect(() => {
-        const previousValues = new Map<string, number>();
-
         const loadData = () => {
             const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
             let stocksToDisplay: Stock[];
@@ -93,24 +92,31 @@ export default function TerminalClient() {
                 stocksToDisplay = mockStocks;
             }
 
-            setStocks(prevStocks => {
-                const updatedStocks = stocksToDisplay.map(stock => {
-                    const prevStock = prevStocks.find(s => s.id === stock.id);
-                    const prevValue = prevStock ? prevStock.value : (previousValues.get(stock.id) || stock.value);
-                    const change = stock.value - prevValue;
-                    const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
-                    
-                    previousValues.set(stock.id, stock.value);
+            const previousValues = previousValuesRef.current;
+            const updatedStocks = stocksToDisplay.map(stock => {
+                let prevValue = previousValues.get(stock.id);
+                if (prevValue === undefined) {
+                    prevValue = stock.value;
+                    previousValues.set(stock.id, prevValue);
+                }
 
-                    return {
-                        ...stock,
-                        prevValue: prevValue,
-                        change: change,
-                        percentChange: percentChange,
-                    };
-                });
-                return updatedStocks;
+                const change = stock.value - prevValue;
+                const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
+                
+                if (stock.value !== prevValue) {
+                   // This is where the magic happens for continuous updates.
+                   // We only update the map when the value from localStorage is different
+                   // but for calculation, we use the value from the last known state.
+                }
+
+                return {
+                    ...stock,
+                    prevValue: prevValue,
+                    change: change,
+                    percentChange: percentChange,
+                };
             });
+            setStocks(updatedStocks);
         };
         
         loadData();

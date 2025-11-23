@@ -76,13 +76,19 @@ export default function MarketMapClient() {
 
         setData(prevData => {
             return stocksToDisplay.map((stock: Stock) => {
-                const prevStock = prevData.find(s => s.id === stock.id);
-                const prevValue = prevStock ? prevStock.value : (previousValues.get(stock.id) || stock.value);
+                let prevValue = previousValues.get(stock.id);
+                if (prevValue === undefined) {
+                  // If we don't have a previous value, use the current value to avoid a huge initial change
+                  prevValue = stock.value;
+                  previousValues.set(stock.id, stock.value);
+                }
+
                 const change = stock.value - prevValue;
                 const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
                 
-                if (change !== 0) {
-                    previousValues.set(stock.id, stock.value);
+                // Only update previous value if there was a change, but also set it initially
+                if (stock.value !== prevValue) {
+                    previousValues.set(stock.id, prevValue); // keep the old value for change calculation
                 }
 
                 return { 
