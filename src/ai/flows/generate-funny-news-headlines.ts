@@ -13,13 +13,11 @@ import {z} from 'genkit';
 
 const GenerateFunnyNewsHeadlineInputSchema = z.object({
   stockTicker: z.string().describe('The stock ticker symbol.'),
-  companyName: z.string().describe('The name of the company.'),
+  companyName: z.string().describe('The name of the company/nickname of the person.'),
+  description: z.string().describe('The AI-generated description of the person.'),
   currentValue: z.number().describe('The current stock value.'),
-  swipeSentiment: z
-    .string()
-    .describe(
-      'General swipe sentiment - number of swipes left vs right, e.g. positive or negative or neutral'
-    ),
+  change: z.number().describe('The change in stock value over the session.'),
+  percentChange: z.number().describe('The percentage change in stock value over the session.'),
 });
 export type GenerateFunnyNewsHeadlineInput = z.infer<
   typeof GenerateFunnyNewsHeadlineInputSchema
@@ -42,16 +40,17 @@ const prompt = ai.definePrompt({
   name: 'generateFunnyNewsHeadlinePrompt',
   input: {schema: GenerateFunnyNewsHeadlineInputSchema},
   output: {schema: GenerateFunnyNewsHeadlineOutputSchema},
-  prompt: `You are a financial news editor with a sarcastic sense of humor.
+  prompt: `You are a financial news editor with a sarcastic, dark sense of humor for a stock market simulation party game with the theme "Geld. Macht. Schön." (Money. Power. Beauty.).
 
-  Based on the following information, generate a funny and engaging news headline about a stock:
+  Based on the following information, generate a funny, ironic, and engaging news headline about a person's stock profile. The tone should be witty and slightly cynical, fitting the theme.
 
   Stock Ticker: {{{stockTicker}}}
-  Company Name: {{{companyName}}}
-  Current Value: {{{currentValue}}}
-  General Swipe Sentiment: {{{swipeSentiment}}}
+  Nickname: {{{companyName}}}
+  Profile Description: {{{description}}}
+  Current Value: \${{{currentValue}}}
+  Session Change: \${{{change}}} ({{{percentChange}}}%)
 
-  Headline:`,
+  Generate a headline. Be creative and sharp.`,
 });
 
 const generateFunnyNewsHeadlineFlow = ai.defineFlow(

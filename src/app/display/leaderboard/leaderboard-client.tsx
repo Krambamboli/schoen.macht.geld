@@ -5,13 +5,12 @@ import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type StockWithChange = Stock & { change: number; percentChange: number };
 
 export default function LeaderboardClient() {
   const [stocks, setStocks] = useState<StockWithChange[]>([]);
-  const initialValuesRef = useRef(new Map<string, number>());
 
   useEffect(() => {
     const loadData = () => {
@@ -22,33 +21,14 @@ export default function LeaderboardClient() {
         return;
       }
       
-      storedStocks.forEach(stock => {
-        if (!initialValuesRef.current.has(stock.id)) {
-            const initialValue = JSON.parse(localStorage.getItem(`initial_stock_${stock.id}`) || 'null');
-            if (initialValue) {
-                initialValuesRef.current.set(stock.id, initialValue);
-            } else {
-                initialValuesRef.current.set(stock.id, stock.value);
-                localStorage.setItem(`initial_stock_${stock.id}`, JSON.stringify(stock.value));
-            }
-        }
-      });
-
-
-      const updatedStocks = storedStocks.map(stock => {
-        const initialValue = initialValuesRef.current.get(stock.id) ?? stock.value;
-        const change = stock.value - initialValue;
-        const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
-        
-        return {
-          ...stock,
-          change,
-          percentChange,
-        };
-      });
+      const stocksWithDefaults = storedStocks.map(s => ({
+          ...s,
+          change: s.change || 0,
+          percentChange: s.percentChange || 0,
+      })) as StockWithChange[];
 
       // Sort by performance (percent change)
-      const sortedStocks = updatedStocks.sort((a, b) => b.percentChange - a.percentChange);
+      const sortedStocks = stocksWithDefaults.sort((a, b) => b.percentChange - a.percentChange);
       
       setStocks(sortedStocks);
     };
@@ -110,5 +90,3 @@ export default function LeaderboardClient() {
     </div>
   );
 }
-
-    

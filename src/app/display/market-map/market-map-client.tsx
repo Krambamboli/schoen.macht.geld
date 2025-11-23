@@ -2,10 +2,10 @@
 'use client';
 
 import type { Stock } from '@/lib/types';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 
-type StockWithChange = Stock & { change: number; percentChange: number };
+type StockWithChange = Stock & { change: number; percentChange: number; size: number };
 
 const CustomizedContent = (props: any) => {
   const { x, y, width, height, name, value, percentChange, ticker } = props;
@@ -48,7 +48,7 @@ const CustomizedContent = (props: any) => {
           <div style={{ fontSize: '0.8rem', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
           <div style={{ marginTop: 'auto', fontSize: '1.2rem', fontWeight: 'bold' }}>
               {isPositive ? '+' : ''}
-              {percentChange?.toFixed(2) ?? '0.00'}%
+              {(percentChange ?? 0).toFixed(2)}%
           </div>
         </div>
       </foreignObject>
@@ -59,7 +59,6 @@ const CustomizedContent = (props: any) => {
 
 export default function MarketMapClient() {
   const [data, setData] = useState<StockWithChange[]>([]);
-  const initialValuesRef = useRef(new Map<string, number>());
 
   useEffect(() => {
      const loadData = () => {
@@ -69,33 +68,17 @@ export default function MarketMapClient() {
             setData([]);
             return;
         }
-        
-        storedStocks.forEach(stock => {
-            if (!initialValuesRef.current.has(stock.id)) {
-                 const initialValue = JSON.parse(localStorage.getItem(`initial_stock_${stock.id}`) || 'null');
-                if (initialValue) {
-                    initialValuesRef.current.set(stock.id, initialValue);
-                } else {
-                    initialValuesRef.current.set(stock.id, stock.value);
-                    localStorage.setItem(`initial_stock_${stock.id}`, JSON.stringify(stock.value));
-                }
-            }
-        });
 
         const updatedData = storedStocks.map((stock: Stock) => {
-            const initialValue = initialValuesRef.current.get(stock.id) ?? stock.value;
-            const change = stock.value - initialValue;
-            const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
-            
             return { 
                 ...stock, 
-                change,
-                percentChange,
+                change: stock.change || 0,
+                percentChange: stock.percentChange || 0,
                 // Treemap size should be based on market cap (value), must be positive
                 size: Math.abs(stock.value) || 1, 
             };
         });
-        setData(updatedData);
+        setData(updatedData as StockWithChange[]);
     };
     
     loadData(); // Initial load
@@ -122,10 +105,12 @@ export default function MarketMapClient() {
           }}
           labelStyle={{ color: 'white' }}
           formatter={(value: number, name: string, props) => {
+              if (!props.payload) return null;
+              
               const payload = props.payload as StockWithChange;
               const currentValue = payload.value;
-              const change = payload.change;
-              const percentChange = payload.percentChange;
+              const change = payload.change || 0;
+              const percentChange = payload.percentChange || 0;
               const isPositive = change >= 0;
 
               return [
@@ -141,5 +126,3 @@ export default function MarketMapClient() {
     </ResponsiveContainer>
   );
 }
-
-    

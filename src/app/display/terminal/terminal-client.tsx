@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 type StockWithChange = Stock & { change: number; percentChange: number };
 
@@ -37,12 +37,16 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
           const result = await generateFunnyNewsHeadline({
             stockTicker: trendingStock.ticker,
             companyName: trendingStock.nickname,
+            description: trendingStock.description,
             currentValue: trendingStock.value,
-            swipeSentiment: trendingStock.change > 0 ? 'positive' : 'negative',
+            change: trendingStock.change,
+            percentChange: trendingStock.percentChange,
           });
           setHeadline(
             `${trendingStock.ticker.toUpperCase()}: ${result.headline}`
           );
+        } else {
+           setHeadline('Market is quiet... too quiet. What are you waiting for?');
         }
       } catch (error) {
         console.error('Failed to generate news headline:', error);
@@ -52,7 +56,12 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
       }
     };
 
-    const interval = setInterval(fetchHeadline, 10000); // Generate new headline every 10 seconds
+    // Don't fetch on first render, wait for some data
+    if (stocks.length > 0) {
+        fetchHeadline();
+    }
+
+    const interval = setInterval(fetchHeadline, 15000); // Generate new headline every 15 seconds
     return () => clearInterval(interval);
   }, [stocks, isGenerating]);
 
@@ -77,42 +86,18 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 
 export default function TerminalClient() {
     const [stocks, setStocks] = useState<StockWithChange[]>([]);
-    const initialValuesRef = useRef(new Map<string, number>());
 
     useEffect(() => {
         const loadData = () => {
             const storedStocks: Stock[] = JSON.parse(localStorage.getItem('stocks') || '[]');
+            
+            const stocksWithChange = storedStocks.map(s => ({
+                ...s,
+                change: s.change || 0,
+                percentChange: s.percentChange || 0,
+            }));
 
-            if (storedStocks.length === 0) {
-              setStocks([]);
-              return;
-            }
-
-            // Initialize initial values if they don't exist yet for new stocks
-            storedStocks.forEach(stock => {
-                if (!initialValuesRef.current.has(stock.id)) {
-                    const initialValue = JSON.parse(localStorage.getItem(`initial_stock_${stock.id}`) || 'null');
-                    if (initialValue) {
-                        initialValuesRef.current.set(stock.id, initialValue);
-                    } else {
-                        initialValuesRef.current.set(stock.id, stock.value);
-                        localStorage.setItem(`initial_stock_${stock.id}`, JSON.stringify(stock.value));
-                    }
-                }
-            });
-
-            const updatedStocks = storedStocks.map(stock => {
-                const initialValue = initialValuesRef.current.get(stock.id) ?? stock.value;
-                const change = stock.value - initialValue;
-                const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
-
-                return {
-                    ...stock,
-                    change,
-                    percentChange,
-                };
-            });
-            setStocks(updatedStocks);
+            setStocks(stocksWithChange as StockWithChange[]);
         };
         
         loadData();
@@ -189,5 +174,3 @@ export default function TerminalClient() {
     </div>
   );
 }
-
-    
