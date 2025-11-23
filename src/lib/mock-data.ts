@@ -45,3 +45,8 @@ export const mockStocks: Stock[] = initialNicknames.map((nickname, index) => {
     photoUrl: image.imageUrl,
     description:
       'KI generierte Beschreibung: Macht Geld wirklich schön? Dieses Profil stellt die These auf die Probe. Investieren Sie jetzt und finden Sie es heraus.',
+    value: initialValue,
+    history: generateHistory(initialValue),
+    sentiment: Math.floor(Math.random() * 100) - 50,
+  };
+});
