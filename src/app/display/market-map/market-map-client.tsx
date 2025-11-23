@@ -6,10 +6,17 @@ import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
+/**
+ * A custom content renderer for the Treemap component from recharts.
+ * It renders each cell of the treemap, styling it based on the stock's performance.
+ * Tiny boxes are not rendered to avoid visual clutter.
+ * @param {any} props - The props provided by the Treemap component.
+ * @returns {JSX.Element | null} The rendered treemap cell or null if the cell is too small.
+ */
 const CustomizedContent = (props: any) => {
   const { x, y, width, height, name, percentChange, ticker } = props;
 
-  // Don't render tiny boxes
+  // Don't render cells that are too small to be readable.
   if (width < 50 || height < 40) {
     return null;
   }
@@ -54,17 +61,25 @@ const CustomizedContent = (props: any) => {
   );
 };
 
+/**
+ * The client component for the Market Map page.
+ * It fetches real-time stock data from Firestore and visualizes it as a treemap.
+ * The size of each rectangle in the treemap represents the stock's current value,
+ * and the color indicates whether its value has increased (green) or decreased (red).
+ * @returns {JSX.Element} The rendered market map client component.
+ */
 export default function MarketMapClient() {
   const { firestore } = useFirebase();
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks } = useCollection<Stock>(titlesCollection);
   
+  // Memoize the data formatted for the treemap to prevent unnecessary re-renders.
   const treemapData = useMemo(() => {
     if (!stocks) return [];
     return stocks.map(stock => ({
       ...stock,
       name: stock.nickname,
-      // Treemap size should be based on market cap (value), must be positive
+      // The size key for the treemap must be a positive number.
       size: Math.abs(stock.currentValue) || 1,
     }));
   }, [stocks]);

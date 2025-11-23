@@ -6,6 +6,14 @@ import { BarChart2, CandlestickChart, TrendingUp, Tv2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+/**
+ * The main layout for all display screens.
+ * It includes the header with the app title and the navigation tabs
+ * to switch between different market views (Ticker, Market Map, Terminal, Leaderboard).
+ * @param {object} props - The component props.
+ * @param {React.ReactNode} props.children - The child components to be rendered within the layout.
+ * @returns {JSX.Element} The rendered display layout component.
+ */
 export default function DisplayLayout({
   children,
 }: {
@@ -13,7 +21,7 @@ export default function DisplayLayout({
 }) {
   const pathname = usePathname();
 
-  // Determine the active tab from the URL path
+  // Determine the active tab from the URL path to highlight the correct tab.
   const activeTab = pathname.split('/').pop() || 'ticker';
 
   const navItems = [

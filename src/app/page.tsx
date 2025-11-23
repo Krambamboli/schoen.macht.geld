@@ -9,6 +9,12 @@ import { Presentation, Smartphone, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/icons';
 
+/**
+ * The home page of the application.
+ * It serves as a splash screen and entry point to the three main parts of the app:
+ * Registration, Stock Swipe, and Market Display.
+ * @returns {JSX.Element} The rendered home page.
+ */
 export default function Home() {
   const features = [
     {

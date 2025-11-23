@@ -5,6 +5,9 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase';
 
+/**
+ * Metadata for the application, used for SEO and browser tab information.
+ */
 export const metadata: Metadata = {
   title: 'Schön. Macht. Geld.',
   description: 'Das ultimative Börsensimulations-Partyspiel von VAK & Amphitheater.',
@@ -16,6 +19,13 @@ const poppins = Poppins({
   variable: '--font-body',
 });
 
+/**
+ * The root layout component for the entire application.
+ * It sets up the HTML structure, global fonts, and providers like Firebase and Toaster.
+ * @param {object} props - The component props.
+ * @param {React.ReactNode} props.children - The child components to be rendered within the layout.
+ * @returns {JSX.Element} The rendered root layout.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

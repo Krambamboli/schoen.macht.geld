@@ -8,19 +8,36 @@ import { useEffect, useRef } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
+/**
+ * The client component for the Leaderboard page.
+ * It fetches all stock data from Firestore in real-time and displays them
+ * in a ranked list based on their percentage change. It also shows
+ * indicators for rank changes (up, down, or same).
+ * @returns {JSX.Element} The rendered leaderboard client component.
+ */
 export default function LeaderboardClient() {
   const { firestore } = useFirebase();
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks } = useCollection<Stock>(titlesCollection);
+  
+  // A ref to store the previous ranking to calculate rank changes.
   const prevRanksRef = useRef<Map<string, number>>(new Map());
 
+  // Sort stocks by the highest percentage change.
   const sortedStocks = stocks ? [...stocks].sort((a, b) => b.percentChange - a.percentChange) : [];
 
+  // Create a map of the current rankings.
   const currentRanks = new Map<string, number>();
   sortedStocks.forEach((stock, index) => {
     currentRanks.set(stock.id, index);
   });
 
+  /**
+   * Compares the current rank of a stock with its previous rank.
+   * @param {string} stockId - The ID of the stock.
+   * @param {number} currentRank - The current rank of the stock.
+   * @returns {'up' | 'down' | 'same'} A string indicating the rank change direction.
+   */
   const getRankChange = (stockId: string, currentRank: number) => {
     if (!prevRanksRef.current.has(stockId)) {
       return 'same';
@@ -31,6 +48,7 @@ export default function LeaderboardClient() {
     return 'same';
   };
   
+  // After each render, update the ref to store the current ranks for the next comparison.
   useEffect(() => {
     prevRanksRef.current = currentRanks;
   });

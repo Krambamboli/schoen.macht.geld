@@ -5,14 +5,20 @@ import { useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
+/**
+ * A component that displays a horizontally scrolling stock ticker.
+ * It fetches real-time stock data from Firestore and animates the prices across the screen.
+ * @returns {JSX.Element} The rendered stock ticker component.
+ */
 const StockTicker = () => {
   const { firestore } = useFirebase();
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks, isLoading } = useCollection<Stock>(titlesCollection);
 
+  // The stock list is duplicated to create a seamless looping animation.
   const repeatedStocks = useMemo(() => {
     if (!stocks || stocks.length === 0) return [];
-    // Ensure the list is long enough for a seamless loop
+    // Ensure the list is long enough for a seamless loop by repeating it.
     const repeatCount = Math.max(2, Math.ceil(40 / stocks.length));
     return Array(repeatCount).fill(stocks).flat();
   }, [stocks]);
@@ -28,7 +34,8 @@ const StockTicker = () => {
     );
   }
 
-  // Calculate a dynamic duration based on the number of original items
+  // Calculate a dynamic animation duration based on the number of items
+  // to maintain a relatively consistent speed.
   const animationDuration = (stocks?.length || 10) * 5;
 
   return (
@@ -82,6 +89,10 @@ const StockTicker = () => {
   );
 };
 
+/**
+ * The main page for the stock ticker display.
+ * @returns {JSX.Element} The rendered display ticker page.
+ */
 export default function DisplayTickerPage() {
   return (
     <div className="h-full w-full">

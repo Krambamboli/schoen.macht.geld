@@ -1,3 +1,8 @@
+/**
+ * Firebase configuration object.
+ * This object is used to initialize the Firebase app.
+ * The values are automatically populated by Firebase App Hosting.
+ */
 export const firebaseConfig = {
   "projectId": "studio-7974049164-9ac0a",
   "appId": "1:551021529948:web:acb4582b55bdc73acf4f99",
