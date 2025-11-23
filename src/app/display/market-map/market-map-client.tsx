@@ -92,6 +92,7 @@ export default function MarketMapClient() {
                 percentChange,
                 // The Treemap `dataKey` should be positive to have an area
                 value: Math.abs(stock.value) || 1, 
+                currentValue: stock.value, // Keep the actual value for the tooltip
             };
         });
         setData(updatedData);
@@ -121,31 +122,17 @@ export default function MarketMapClient() {
           }}
           labelStyle={{ color: 'white' }}
           formatter={(value: number, name: string, props) => {
-              const { payload } = props;
-              // The original value is not on `value` anymore, let's get it from the payload
-              const originalValue = payload.originalValue;
+              const payload = props.payload as StockWithChange & { currentValue: number };
+              const currentValue = payload.currentValue;
               const change = payload.change;
               const percentChange = payload.percentChange;
               const isPositive = change >= 0;
               return [
-                  `$${(originalValue as number).toFixed(2)}`,
+                  `$${(currentValue as number).toFixed(2)}`,
                   `${isPositive ? '+' : ''}${change.toFixed(2)} (${percentChange.toFixed(2)}%)`
               ]
           }}
-          // We need to add originalValue to the payload so formatter can use it
-          payloadCreator={(props) => {
-             if (props.payload && props.payload[0] && props.payload[0].payload) {
-                const stock = props.payload[0].payload;
-                return [{
-                    ...props.payload[0],
-                    payload: {
-                        ...stock,
-                        originalValue: stock.history[stock.history.length-1]?.value ?? stock.value
-                    }
-                }];
-            }
-            return [];
-          }}
+          labelFormatter={(label) => <span className="font-bold text-lg">{label}</span>}
         />
       </Treemap>
     </ResponsiveContainer>
