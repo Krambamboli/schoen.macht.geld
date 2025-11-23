@@ -1,55 +1,33 @@
 'use client';
 
-import type { Stock } from '@/lib/types';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { Stock } from '@/lib/types';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { Heart, X, Loader2 } from 'lucide-react';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc, arrayUnion, runTransaction } from 'firebase/firestore';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 
 export default function SwipeClient() {
-  const [stocks, setStocks] = useState<Stock[]>([]);
+  const { firestore, auth, user, isUserLoading } = useFirebase();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const initialValuesRef = useRef(new Map<string, number>());
+
+  const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
+  const { data: stocks, isLoading: isLoadingStocks } = useCollection<Stock>(titlesCollection);
 
   useEffect(() => {
     setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-
-    const loadStocks = () => {
-      const storedStocks: Stock[] = JSON.parse(localStorage.getItem('stocks') || '[]');
-      
-      if (storedStocks.length === 0) {
-        setIsLoading(false);
-        setStocks([]);
-        return;
-      }
-      
-      storedStocks.forEach(stock => {
-        if (!initialValuesRef.current.has(stock.id)) {
-            const initialValue = JSON.parse(localStorage.getItem(`initial_stock_${stock.id}`) || 'null');
-            if (initialValue) {
-                 initialValuesRef.current.set(stock.id, initialValue);
-            } else {
-                initialValuesRef.current.set(stock.id, stock.value);
-                localStorage.setItem(`initial_stock_${stock.id}`, JSON.stringify(stock.value));
-            }
-        }
-      });
-
-      setStocks(storedStocks);
-      setIsLoading(false);
-    };
-
-    loadStocks();
-    const interval = setInterval(loadStocks, 2000); 
-
-    return () => clearInterval(interval);
-
   }, []);
+
+  useEffect(() => {
+    if (!isUserLoading && !user && auth) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [isUserLoading, user, auth]);
 
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-30, 30]);
@@ -58,39 +36,48 @@ export default function SwipeClient() {
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (stocks.length === 0) return;
+    if (!firestore || !stocks || stocks.length === 0) return;
+
+    const stockToUpdate = stocks[currentIndex % stocks.length];
+    if (!stockToUpdate) return;
     
     const exitX = direction === 'right' ? 300 : -300;
     animate(x, exitX, {
       duration: 0.3,
-      onComplete: () => {
-        const allStocks: Stock[] = JSON.parse(localStorage.getItem('stocks') || '[]');
-        const stockToUpdate = allStocks[currentIndex % allStocks.length];
-        
-        if (!stockToUpdate) return; // Should not happen
-
-        const initialValue = initialValuesRef.current.get(stockToUpdate.id) ?? stockToUpdate.value;
+      onComplete: async () => {
         const valueChange = direction === 'right' ? 0.1 : -0.1;
-        const newValue = stockToUpdate.value + valueChange;
+        const stockRef = doc(firestore, 'titles', stockToUpdate.id);
 
-        const change = newValue - initialValue;
-        const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
+        try {
+           await runTransaction(firestore, async (transaction) => {
+              const stockDoc = await transaction.get(stockRef);
+              if (!stockDoc.exists()) {
+                throw "Document does not exist!";
+              }
 
-        const updatedStocks = allStocks.map((s: Stock) => 
-            s.id === stockToUpdate.id 
-            ? { 
-                ...s, 
-                value: newValue,
-                change: change,
-                percentChange: percentChange,
-              } 
-            : s
-        );
+              const currentData = stockDoc.data() as Stock;
+              const newValue = currentData.currentValue + valueChange;
+              const newChange = newValue - currentData.initialValue;
+              const newPercentChange = (newChange / currentData.initialValue) * 100;
+              
+              let newHistory = [...currentData.history, { value: newValue, timestamp: new Date().toISOString() }];
+              if (newHistory.length > 100) {
+                newHistory = newHistory.slice(newHistory.length - 100);
+              }
 
-        localStorage.setItem('stocks', JSON.stringify(updatedStocks));
+              transaction.update(stockRef, { 
+                currentValue: newValue,
+                change: newChange,
+                percentChange: newPercentChange,
+                history: newHistory,
+              });
+           });
 
-        // Go to the next stock, looping infinitely
-        setCurrentIndex((prev) => (prev + 1) % stocks.length);
+        } catch (e) {
+          console.error("Transaction failed: ", e);
+        }
+
+        setCurrentIndex((prev) => (prev + 1));
         x.set(0);
       },
     });
@@ -100,6 +87,8 @@ export default function SwipeClient() {
     if (!stocks || stocks.length === 0) return null;
     return stocks[currentIndex % stocks.length];
   }, [stocks, currentIndex]);
+
+  const isLoading = isLoadingStocks || isUserLoading;
 
   if (isLoading) {
      return (
@@ -127,7 +116,6 @@ export default function SwipeClient() {
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
       <div className="relative w-full h-full flex items-center justify-center">
-        {/* We only render the top card for simplicity and performance */}
         <motion.div
           key={currentStock.id}
           className="absolute w-[90vw] h-[80vh] max-w-sm max-h-[600px]"
@@ -179,7 +167,7 @@ export default function SwipeClient() {
                   {currentStock.nickname}
                 </h2>
                 <p className="text-2xl font-mono text-green-300">
-                  ${currentStock.value.toFixed(2)}
+                  ${currentStock.currentValue.toFixed(2)}
                 </p>
               </div>
               <p className="mt-2 text-lg text-white/80">
@@ -195,6 +183,7 @@ export default function SwipeClient() {
             variant="outline"
             className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border-red-500/50 text-red-500 hover:bg-red-500/20 hover:text-red-400"
             onClick={() => handleSwipe('left')}
+            disabled={!user}
           >
             <X className="w-12 h-12" />
           </Button>
@@ -202,6 +191,7 @@ export default function SwipeClient() {
             variant="outline"
             className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border-green-400/50 text-green-400 hover:bg-green-400/20 hover:text-green-300"
             onClick={() => handleSwipe('right')}
+            disabled={!user}
           >
             <Heart className="w-12 h-12" />
           </Button>

@@ -31,6 +31,10 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFirebase } from '@/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export default function RegistrationClient() {
   const [nickname, setNickname] = useState('');
@@ -46,9 +50,15 @@ export default function RegistrationClient() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+  const { firestore, auth, user, isUserLoading } = useFirebase();
+
+  useEffect(() => {
+    if (!isUserLoading && !user && auth) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [isUserLoading, user, auth]);
 
   const stopStream = useCallback(() => {
-    // Access the stream from the state inside the callback to ensure it's the latest version.
     setStream(currentStream => {
         if (currentStream) {
             currentStream.getTracks().forEach(track => track.stop());
@@ -185,6 +195,11 @@ export default function RegistrationClient() {
   };
 
   const handleRegister = () => {
+    if (!firestore || !user) {
+       toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait a moment and try again.' });
+       return;
+    }
+
     if (!nickname || !photoDataUrl || !description) {
        toast({
         variant: 'destructive',
@@ -196,40 +211,25 @@ export default function RegistrationClient() {
     
     setIsRegistering(true);
     
-    const initialValue = 100;
+    const initialValue = 100.0;
+    const docId = Date.now().toString();
+
     const newStock = {
-      id: Date.now().toString(),
+      id: docId,
       ticker: nickname.substring(0, 4).toUpperCase().padEnd(4, 'X'),
       nickname,
       photoUrl: photoDataUrl,
       description,
-      value: initialValue,
-      history: [],
-      sentiment: 0,
+      currentValue: initialValue,
+      initialValue: initialValue,
       change: 0,
       percentChange: 0,
+      history: [{ value: initialValue, timestamp: new Date().toISOString() }],
     };
     
-    // This is the first ever registration, clear all mock data and session history
-    const isFirstRegistration = localStorage.getItem('firstRegistration') !== 'true';
-    if (isFirstRegistration) {
-      // Clear all stock-related data
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('stock_') || key.startsWith('initial_stock_') || key === 'stocks' || key === 'firstRegistration') {
-          localStorage.removeItem(key);
-        }
-      });
-      localStorage.setItem('firstRegistration', 'true');
-      localStorage.setItem('stocks', JSON.stringify([newStock]));
-      localStorage.setItem(`initial_stock_${newStock.id}`, JSON.stringify(initialValue));
+    const docRef = doc(firestore, 'titles', docId);
 
-    } else {
-      const existingStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
-      const newStockList = [...existingStocks, newStock];
-      localStorage.setItem('stocks', JSON.stringify(newStockList));
-      localStorage.setItem(`initial_stock_${newStock.id}`, JSON.stringify(initialValue));
-    }
-
+    setDocumentNonBlocking(docRef, newStock, {});
 
     setTimeout(() => {
       toast({
@@ -366,7 +366,7 @@ export default function RegistrationClient() {
           size="lg"
           className="w-full"
           onClick={handleRegister}
-          disabled={!nickname || !photoDataUrl || !description || isRegistering}
+          disabled={!nickname || !photoDataUrl || !description || isRegistering || isUserLoading || !user}
         >
           {isRegistering && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Register Your Stock

@@ -1,66 +1,31 @@
-/**
- * This ruleset enforces a public-read model for a market simulation application.
- *
- * Core Philosophy:
- * The primary goal is to make all market data publicly accessible for reading and listing,
- * allowing any client to display title information. Write operations (creating, updating,
- * or deleting titles), however, are currently disabled by default as a critical security
- * measure. To enable writes, the data model must be updated to include an ownership
- * field (e.g., 'creatorId' or 'adminId') to ensure that only authorized users or
- * processes can modify market data.
- *
- * Data Structure:
- * All data is stored in a single top-level collection: /titles/{titleId}.
- * - /titles/{titleId}: Contains all information for a single tradable asset.
- *
- * Key Security Decisions:
- * - Public Read Access: All documents in the `/titles` collection can be read by any
- *   user, whether authenticated or not. This supports the application's need to
- *   publicly display market data.
- * - Default-Deny for Writes: All write operations are explicitly denied. This is a
- *   deliberate security choice because the 'Title' entity is missing an ownership
- *   field. Without it, there is no way to securely authorize who can create,
- *   update, or delete a title. This prevents unauthorized data manipulation.
- *   Actionable TODOs are included to guide the developer on how to enable writes
- *   securely.
- * - No Data Validation: In line with the prototyping philosophy, these rules do not
- *   validate the shape or type of the data within a 'Title' document. The focus
- *   is solely on controlling access.
- */
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
      * @description
      *   Manages 'Title' documents, representing tradable assets. Data is public for
-     *   reading, but all write operations are currently disabled due to a missing
-     *   ownership field in the data model.
+     *   reading, and write operations are allowed for authenticated users.
      * @path
      *   /titles/{titleId}
-     * @allow
-     *   (get) Any user, signed in or not, can read a title document.
-     * @deny
-     *   (create) Any user attempting to create a new title document will be denied.
-     * @principle
-     *   Implements a public-read model. Writes are secured by default-deny until an
-     *   ownership model (e.g., a 'creatorId' field) is added to the schema.
      */
     match /titles/{titleId} {
       // Allow anyone to read individual title documents and list the entire collection.
       // This is safe as the data is intended for public display.
-      allow get: if true;
-      allow list: if true;
+      allow read: if true;
 
-      // CRITICAL: Cannot implement secure writes. The 'Title' entity is missing an
-      // ownership field like 'creatorId' or 'ownerId'. To enable writes, you must:
-      // 1. Add an ownership field to the 'Title' entity in your data model.
-      // 2. Update the rules below to validate that field against the user's auth UID.
-      // Example for 'create': allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
-      // Example for 'update': allow update: if isSignedIn() && resource.data.creatorId == request.auth.uid;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // Allow any authenticated user to create a new title.
+      // We will use anonymous authentication for the registration and swipe kiosks.
+      allow create: if request.auth != null;
+
+      // Allow any authenticated user to update a title.
+      // This is necessary for the swipe kiosk to update stock values.
+      allow update: if request.auth != null;
+      
+      // Deleting titles is not part of the application's functionality.
+      allow delete: if false;
     }
   }
 }

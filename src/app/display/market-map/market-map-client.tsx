@@ -1,14 +1,12 @@
-
 'use client';
 
 import type { Stock } from '@/lib/types';
-import { useEffect, useState } from 'react';
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
-
-type StockWithChange = Stock & { change: number; percentChange: number; size: number };
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 const CustomizedContent = (props: any) => {
-  const { x, y, width, height, name, value, percentChange, ticker } = props;
+  const { x, y, width, height, name, percentChange, ticker } = props;
 
   // Don't render tiny boxes
   if (width < 50 || height < 40) {
@@ -56,43 +54,27 @@ const CustomizedContent = (props: any) => {
   );
 };
 
-
 export default function MarketMapClient() {
-  const [data, setData] = useState<StockWithChange[]>([]);
-
-  useEffect(() => {
-     const loadData = () => {
-        const storedStocks: Stock[] = JSON.parse(localStorage.getItem('stocks') || '[]');
-
-        if (storedStocks.length === 0) {
-            setData([]);
-            return;
-        }
-
-        const updatedData = storedStocks.map((stock: Stock) => {
-            return { 
-                ...stock, 
-                change: stock.change || 0,
-                percentChange: stock.percentChange || 0,
-                // Treemap size should be based on market cap (value), must be positive
-                size: Math.abs(stock.value) || 1, 
-            };
-        });
-        setData(updatedData as StockWithChange[]);
-    };
-    
-    loadData(); // Initial load
-    const dataInterval = setInterval(loadData, 2000); // Refresh data every 2 seconds
-
-    return () => clearInterval(dataInterval);
-  }, []);
+  const { firestore } = useFirebase();
+  const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
+  const { data: stocks } = useCollection<Stock>(titlesCollection);
   
+  const treemapData = useMemo(() => {
+    if (!stocks) return [];
+    return stocks.map(stock => ({
+      ...stock,
+      name: stock.nickname,
+      // Treemap size should be based on market cap (value), must be positive
+      size: Math.abs(stock.currentValue) || 1,
+    }));
+  }, [stocks]);
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <Treemap
-        data={data}
+        data={treemapData}
         dataKey="size"
-        nameKey="nickname"
+        nameKey="name"
         aspectRatio={16 / 9}
         content={<CustomizedContent />}
         isAnimationActive={false}
@@ -107,16 +89,13 @@ export default function MarketMapClient() {
           formatter={(value: number, name: string, props) => {
               if (!props.payload) return null;
               
-              const payload = props.payload as StockWithChange;
-              const currentValue = payload.value;
-              const change = payload.change || 0;
-              const percentChange = payload.percentChange || 0;
-              const isPositive = change >= 0;
+              const payload = props.payload as Stock;
+              const isPositive = payload.change >= 0;
 
               return [
-                  `$${currentValue.toFixed(2)}`,
+                   `$${payload.currentValue.toFixed(2)}`,
                    <span key="change" className={isPositive ? 'text-green-400' : 'text-red-500'}>
-                    {isPositive ? '+' : ''}{change.toFixed(2)} ({percentChange.toFixed(2)}%)
+                    {isPositive ? '+' : ''}{payload.change.toFixed(2)} ({payload.percentChange.toFixed(2)}%)
                    </span>
               ]
           }}
