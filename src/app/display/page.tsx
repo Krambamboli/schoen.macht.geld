@@ -8,6 +8,7 @@ import { collection } from 'firebase/firestore';
 /**
  * A component that displays a horizontally scrolling stock ticker.
  * It fetches real-time stock data from Firestore and animates the prices across the screen.
+ * The color and arrow indicator are based on the change in the last minute.
  * @returns {JSX.Element} The rendered stock ticker component.
  */
 const StockTicker = () => {
@@ -45,7 +46,7 @@ const StockTicker = () => {
         style={{ animationDuration: `${animationDuration}s` }}
       >
         {repeatedStocks.map((stock, index) => {
-          const isPositive = stock.change >= 0;
+          const lastChangeIsPositive = stock.valueChangeLastMinute >= 0;
           return (
             <div
               key={`${stock.id}-${index}`}
@@ -56,17 +57,17 @@ const StockTicker = () => {
               </span>
               <span
                 className={`text-2xl font-mono font-bold ml-3 ${
-                  isPositive ? 'text-green-400' : 'text-red-400'
+                  lastChangeIsPositive ? 'text-green-400' : 'text-red-400'
                 }`}
               >
                 {stock.currentValue.toFixed(2)} CHF
               </span>
               <span
                 className={`ml-2 text-lg ${
-                  isPositive ? 'text-green-400' : 'text-red-400'
+                  lastChangeIsPositive ? 'text-green-400' : 'text-red-400'
                 }`}
               >
-                {stock.change > 0 ? '▲' : stock.change < 0 ? '▼' : ''}
+                {stock.valueChangeLastMinute > 0 ? '▲' : stock.valueChangeLastMinute < 0 ? '▼' : ''}
               </span>
             </div>
           );

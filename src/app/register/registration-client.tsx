@@ -263,6 +263,8 @@ export default function RegistrationClient() {
       change: 0,
       percentChange: 0,
       valueChangeLastMinute: 0,
+      valueChangeLast5Minutes: 0,
+      percentChangeLast5Minutes: 0,
       history: [{ value: initialValue, timestamp: new Date().toISOString() }],
     };
     

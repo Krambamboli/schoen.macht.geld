@@ -69,6 +69,8 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
 
   // Set up an interval to fetch a new headline periodically.
   useEffect(() => {
+    // Run it once immediately at the start.
+    fetchHeadline(); 
     const interval = setInterval(fetchHeadline, 30000); // Generate a new headline every 30s
     return () => clearInterval(interval);
   }, [fetchHeadline]);
@@ -81,7 +83,7 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   const handleAnimationIteration = useCallback(() => {
     if (nextHeadline) {
       setCurrentHeadline(nextHeadline);
-      setNextHeadline(''); // Clear next headline so we know we can fetch a new one
+      setNextHeadline(''); // Clear next headline so we can fetch a new one
       // The fetchHeadline interval will eventually call and set a new nextHeadline
     }
   }, [nextHeadline]);
@@ -164,7 +166,7 @@ export default function TerminalClient() {
 
 
   return (
-    <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono">
+    <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono overflow-hidden">
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
         <h1 className="text-2xl">SMG TERMINAL</h1>
       </div>
@@ -176,15 +178,14 @@ export default function TerminalClient() {
               <TableHead className="text-yellow-400">TICKER</TableHead>
               <TableHead className="text-yellow-400">NICKNAME</TableHead>
               <TableHead className="text-yellow-400 text-right">WERT</TableHead>
-              <TableHead className="text-yellow-400 text-right">CHG</TableHead>
-              <TableHead className="text-yellow-400 text-right">% CHG</TableHead>
+              <TableHead className="text-yellow-400 text-right">CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 text-right">% CHG (5M)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedStocks
               .map((stock, index) => {
-                const isPositive = stock.change >= 0;
-                const changeLastMinutePositive = (stock.valueChangeLastMinute ?? 0) >= 0;
+                const changeLast5MinPositive = (stock.valueChangeLast5Minutes ?? 0) >= 0;
                 const rankChange = getRankChange(stock.id, index);
 
                 let RankIndicator;
@@ -210,7 +211,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right font-bold',
-                        isPositive ? 'text-green-400' : 'text-red-500'
+                        stock.change >= 0 ? 'text-green-400' : 'text-red-500'
                       )}
                     >
                       {stock.currentValue.toFixed(2)} CHF
@@ -218,20 +219,20 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                        stock.valueChangeLastMinute === 0 ? 'text-gray-500' : changeLastMinutePositive ? 'text-green-400' : 'text-red-500'
+                        stock.valueChangeLast5Minutes === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      {stock.valueChangeLastMinute > 0 ? '+' : ''}
-                      {(stock.valueChangeLastMinute ?? 0).toFixed(2)}
+                      {stock.valueChangeLast5Minutes >= 0 ? '+' : ''}
+                      {(stock.valueChangeLast5Minutes ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell
                       className={cn(
                         'text-right',
-                         stock.percentChange === 0 ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-500'
+                         stock.percentChangeLast5Minutes === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      {stock.percentChange > 0 ? '+' : ''}
-                      {stock.percentChange.toFixed(2)}%
+                      {stock.percentChangeLast5Minutes >= 0 ? '+' : ''}
+                      {stock.percentChangeLast5Minutes.toFixed(2)}%
                     </TableCell>
                   </TableRow>
                 );
