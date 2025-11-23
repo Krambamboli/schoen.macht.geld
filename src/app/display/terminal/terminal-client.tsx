@@ -12,71 +12,88 @@ import {
 import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
-  const [headline, setHeadline] = useState(
+  const [currentHeadline, setCurrentHeadline] = useState(
     'Willkommen beim Schön. Macht. Geld. News Network.'
   );
+  const [nextHeadline, setNextHeadline] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const tickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchHeadline = async () => {
-      if (isGenerating || !stocks || stocks.length === 0) return;
+  const fetchHeadline = useCallback(async () => {
+    if (isGenerating || !stocks || stocks.length === 0) return;
+    setIsGenerating(true);
+    try {
+      const trendingStock = [...stocks].sort(
+        (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
+      )[0];
 
-      setIsGenerating(true);
-      try {
-        const trendingStock = [...stocks].sort(
-          (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
-        )[0];
-
-        if (trendingStock && trendingStock.change !== 0) {
-          const result = await generateFunnyNewsHeadline({
-            stockTicker: trendingStock.ticker,
-            companyName: trendingStock.nickname,
-            description: trendingStock.description,
-            currentValue: trendingStock.currentValue,
-            change: trendingStock.change,
-            percentChange: trendingStock.percentChange,
-          });
-          setHeadline(
-            `${trendingStock.ticker.toUpperCase()}: ${result.headline}`
-          );
-        } else {
-           setHeadline('Der Markt ist ruhig... zu ruhig. Worauf wartest du?');
-        }
-      } catch (error) {
-        console.error('Failed to generate news headline:', error);
-        setHeadline('NEWS: Der Markt hat technische Schwierigkeiten... oder sind es nur Gefühle?');
-      } finally {
-        setIsGenerating(false);
+      if (trendingStock && trendingStock.change !== 0) {
+        const result = await generateFunnyNewsHeadline({
+          stockTicker: trendingStock.ticker,
+          companyName: trendingStock.nickname,
+          description: trendingStock.description,
+          currentValue: trendingStock.currentValue,
+          change: trendingStock.change,
+          percentChange: trendingStock.percentChange,
+        });
+        setNextHeadline(
+          `${trendingStock.ticker.toUpperCase()}: ${result.headline}`
+        );
+      } else {
+        setNextHeadline('Der Markt ist ruhig... zu ruhig. Worauf wartest du?');
       }
-    };
-
-    if (stocks && stocks.length > 0) {
-        fetchHeadline();
+    } catch (error) {
+      console.error('Failed to generate news headline:', error);
+      setNextHeadline('NEWS: Der Markt hat technische Schwierigkeiten... oder sind es nur Gefühle?');
+    } finally {
+      setIsGenerating(false);
     }
-
-    const interval = setInterval(fetchHeadline, 15000);
-    return () => clearInterval(interval);
   }, [stocks, isGenerating]);
 
+  useEffect(() => {
+    fetchHeadline(); // Initial fetch
+    const interval = setInterval(fetchHeadline, 20000); // Generate a new headline every 20s
+    return () => clearInterval(interval);
+  }, [fetchHeadline]);
+
+  const handleAnimationIteration = useCallback(() => {
+    if (nextHeadline) {
+      setCurrentHeadline(nextHeadline);
+      setNextHeadline(''); // Clear next headline so we know we can fetch a new one
+    }
+  }, [nextHeadline]);
+
+  useEffect(() => {
+    const tickerElement = tickerRef.current;
+    if (tickerElement) {
+      tickerElement.addEventListener('animationiteration', handleAnimationIteration);
+      return () => {
+        tickerElement.removeEventListener('animationiteration', handleAnimationIteration);
+      };
+    }
+  }, [handleAnimationIteration]);
 
   return (
     <div className="w-full bg-red-700 text-white h-10 flex items-center overflow-hidden">
-      <div className="flex animate-marquee-fast whitespace-nowrap">
-        <span className="text-xl font-bold px-12">{headline}</span>
-        <span className="text-xl font-bold px-12">{headline}</span>
+      <div
+        ref={tickerRef}
+        className="flex animate-marquee-fast whitespace-nowrap"
+      >
+        <span className="text-xl font-bold px-12">{currentHeadline}</span>
+        <span className="text-xl font-bold px-12" aria-hidden="true">{currentHeadline}</span>
       </div>
-       <style jsx>{`
+      <style jsx>{`
         @keyframes marquee-fast {
-            from { transform: translateX(0); }
-            to { transform: translateX(-50%); }
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
         }
         .animate-marquee-fast {
-            animation: marquee-fast 30s linear infinite;
+          animation: marquee-fast 30s linear infinite;
         }
       `}</style>
     </div>
