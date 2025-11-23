@@ -102,10 +102,9 @@ export default function MarketMapClient() {
           }}
           labelStyle={{ color: 'white' }}
           formatter={(value: number, name: string, props) => {
-              if (!props.payload) return null;
+              if (!props.payload?.payload) return null;
               
-              const payload = props.payload as Stock & { payload: Stock };
-              const stockData = payload.payload;
+              const stockData = props.payload.payload as Stock;
               const isPositive = stockData.change >= 0;
 
               return [
