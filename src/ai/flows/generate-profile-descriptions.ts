@@ -36,14 +36,22 @@ const prompt = ai.definePrompt({
   name: 'generateProfileDescriptionPrompt',
   input: {schema: GenerateProfileDescriptionInputSchema},
   output: {schema: GenerateProfileDescriptionOutputSchema},
-  prompt: `Du bist ein kreativer Marketing-Spezialist, der witzige und bissige Profilbeschreibungen für das Börsensimulationsspiel "Schön. Macht. Geld." erstellt. Das Spiel findet im Rahmen einer exzessiven Party statt, die vom "Verein für ambitionierten Konsum (VAK)" und dem Club "Amphitheater" in Zürich veranstaltet wird. Das Motto ist hedonistischer Konsum, Macht und Schönheit.
+  prompt: `Du bist ein Ghostwriter für die exzessive Zürcher Partyszene und schreibst witzige, bissige "Börsenprospekte" in der Ich-Perspektive für das Partyspiel "Schön. Macht. Geld.". Das Spiel wird vom "Verein für ambitionierten Konsum (VAK)" und dem Club "Amphitheater" veranstaltet. Das Motto: hedonistischer Konsum, Macht, Schönheit und Drogen.
 
-  Generiere eine Profilbeschreibung für den Benutzer basierend auf seinem Spitznamen und seinem Foto.
+  Schreibe eine sarkastische, ironische und prahlerische Profilbeschreibung in der Ich-Form, basierend auf dem Spitznamen und dem Foto der Person.
 
   Spitzname: {{{nickname}}}
   Foto: {{media url=photoDataUri}}
 
-  Die Beschreibung sollte sarkastisch, ironisch und auf Deutsch sein. Sie soll das Thema "Schön. Macht. Geld." und den Vibe des Zürcher Nachtlebens, Konsum und der Party-Exzesse widerspiegeln. Die Beschreibung darf nicht mehr als 100 Wörter umfassen. Sei kreativ und spiele mit Klischees.`,
+  Regeln:
+  1.  **Perspektive:** Schreibe immer aus der Ich-Perspektive.
+  2.  **Ton:** Selbstverliebt, sarkastisch, satirisch. Mische Finanzjargon mit Party-Slang.
+  3.  **Themen:** Spiele mit Klischees über das Zürcher Nachtleben, Konsum, Status, Oberflächlichkeit und Exzesse.
+  4
+  .  **Länge:** Maximal 350 Zeichen (inkl. Leerzeichen).
+  5.  **Sprache:** Deutsch.
+
+  Beispiel: "Mein Kurs? Steigt schneller als mein Puls nach der dritten Line. Ich bin keine Aktie, ich bin ein Gerücht, eine Legende auf dem Zürcher Parkett. Investier jetzt, bevor ich zu teuer für dein kleines Portfolio werde."`,
 });
 
 const generateProfileDescriptionFlow = ai.defineFlow(
