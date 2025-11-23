@@ -3,6 +3,12 @@ import { Logo } from '@/components/icons';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+/**
+ * The server component for the registration page.
+ * It provides the layout and renders the `RegistrationClient` component,
+ * which handles the interactive parts of the registration process.
+ * @returns {JSX.Element} The rendered registration page.
+ */
 export default function RegisterPage() {
   return (
     <div className="relative min-h-screen w-full bg-background flex flex-col items-center justify-center p-4">

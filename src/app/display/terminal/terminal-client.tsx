@@ -16,6 +16,13 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
+/**
+ * A component that displays a scrolling news ticker with AI-generated headlines.
+ * Headlines are generated periodically based on the most volatile stock.
+ * @param {object} props - The component props.
+ * @param {Stock[]} props.stocks - The array of current stocks.
+ * @returns {JSX.Element} The rendered news ticker component.
+ */
 const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   const [currentHeadline, setCurrentHeadline] = useState(
     'Willkommen beim Schön. Macht. Geld. News Network.'
@@ -24,10 +31,15 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const tickerRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Fetches a new headline from the AI flow. It identifies the "trending" stock
+   * (most volatile) and generates a headline for it.
+   */
   const fetchHeadline = useCallback(async () => {
     if (isGenerating || !stocks || stocks.length === 0) return;
     setIsGenerating(true);
     try {
+      // Find the stock with the largest absolute percentage change.
       const trendingStock = [...stocks].sort(
         (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
       )[0];
@@ -55,20 +67,26 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
     }
   }, [stocks, isGenerating]);
 
+  // Set up an interval to fetch a new headline periodically.
   useEffect(() => {
-    fetchHeadline(); // Initial fetch
     const interval = setInterval(fetchHeadline, 30000); // Generate a new headline every 30s
     return () => clearInterval(interval);
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchHeadline]);
 
+  /**
+   * This function is called when the CSS animation completes an iteration.
+   * It seamlessly swaps the `currentHeadline` with the `nextHeadline` that
+   * has been pre-fetched in the background.
+   */
   const handleAnimationIteration = useCallback(() => {
     if (nextHeadline) {
       setCurrentHeadline(nextHeadline);
       setNextHeadline(''); // Clear next headline so we know we can fetch a new one
+      // The fetchHeadline interval will eventually call and set a new nextHeadline
     }
   }, [nextHeadline]);
 
+  // Add and remove the event listener for the animation iteration.
   useEffect(() => {
     const tickerElement = tickerRef.current;
     if (tickerElement) {
@@ -96,19 +114,26 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
           to { transform: translateX(-50%); }
         }
         .animate-marquee-fast {
-          animation: marquee-fast 30s linear infinite;
+          animation: marquee-fast 45s linear infinite;
         }
       `}</style>
     </div>
   );
 };
 
+/**
+ * The main client component for the Terminal display. It resembles a financial
+ * terminal, showing a table of all stocks with their values and changes.
+ * It also includes the AI-powered NewsTicker at the bottom.
+ * @returns {JSX.Element} The rendered terminal client component.
+ */
 export default function TerminalClient() {
     const { firestore } = useFirebase();
     const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
     const { data: stocks } = useCollection<Stock>(titlesCollection);
     const prevRanksRef = useRef<Map<string, number>>(new Map());
 
+    // Sort stocks by current value to establish ranking.
     const sortedStocks = stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
 
     const currentRanks = new Map<string, number>();
@@ -116,6 +141,12 @@ export default function TerminalClient() {
         currentRanks.set(stock.id, index);
     });
 
+    /**
+     * Determines the rank change of a stock compared to the previous render.
+     * @param {string} stockId - The ID of the stock.
+     * @param {number} currentRank - The stock's current rank in the sorted list.
+     * @returns {'up' | 'down' | 'same'} The direction of rank change.
+     */
     const getRankChange = (stockId: string, currentRank: number) => {
       if (!prevRanksRef.current.has(stockId)) {
           return 'same';
@@ -126,6 +157,7 @@ export default function TerminalClient() {
       return 'same';
     };
     
+    // After each render, save the current rankings to the ref for the next comparison.
     useEffect(() => {
       prevRanksRef.current = currentRanks;
     });

@@ -11,6 +11,13 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, runTransaction } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 
+/**
+ * The main client component for the Swipe Kiosk.
+ * This component is the engine of the market, allowing users to influence stock values.
+ * It fetches stocks from Firestore, displays them as swipeable cards, and on swipe,
+ * runs a Firestore transaction to update the stock's value and history.
+ * @returns {JSX.Element} The rendered swipe client component.
+ */
 export default function SwipeClient() {
   const { firestore, auth, user, isUserLoading } = useFirebase();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -19,22 +26,32 @@ export default function SwipeClient() {
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks, isLoading: isLoadingStocks } = useCollection<Stock>(titlesCollection);
 
+  // Detect if the device has touch capabilities to enable/disable drag gestures.
   useEffect(() => {
     setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
   }, []);
 
+  // Initiate anonymous sign-in if the user is not authenticated.
+  // This is required to have write permissions to Firestore.
   useEffect(() => {
     if (!isUserLoading && !user && auth) {
       initiateAnonymousSignIn(auth);
     }
   }, [isUserLoading, user, auth]);
 
+  // Framer Motion values for card animations.
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-30, 30]);
   const opacity = useTransform(x, [-200, 0, 200], [0.5, 1, 0.5]);
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
+  /**
+   * Handles the swipe action, either from a drag gesture or a button click.
+   * It animates the card off-screen and then triggers a Firestore transaction
+   * to update the stock's data.
+   * @param {'left' | 'right'} direction - The direction of the swipe.
+   */
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!firestore || !stocks || stocks.length === 0) return;
 
@@ -49,6 +66,8 @@ export default function SwipeClient() {
         const stockRef = doc(firestore, 'titles', stockToUpdate.id);
 
         try {
+          // Use a Firestore transaction to safely read and write the stock data.
+          // This prevents race conditions if multiple users swipe the same stock at once.
            await runTransaction(firestore, async (transaction) => {
               const stockDoc = await transaction.get(stockRef);
               if (!stockDoc.exists()) {
@@ -59,21 +78,25 @@ export default function SwipeClient() {
               const now = new Date();
               const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
 
+              // Calculate new values.
               const newValue = currentData.currentValue + valueChange;
               const newChange = newValue - currentData.initialValue;
               const newPercentChange = (newChange / currentData.initialValue) * 100;
               
+              // Update history, keeping only the last 100 entries.
               let newHistory = [...currentData.history, { value: newValue, timestamp: now.toISOString() }];
               if (newHistory.length > 100) {
                 newHistory = newHistory.slice(newHistory.length - 100);
               }
 
+              // Calculate the change in the last minute.
               const recentHistory = newHistory.filter(
                 (h) => new Date(h.timestamp) > oneMinuteAgo
               );
               const oldestValueInLastMinute = recentHistory.length > 0 ? recentHistory[0].value : currentData.currentValue;
               const valueChangeLastMinute = newValue - oldestValueInLastMinute;
 
+              // Update the document in the transaction.
               transaction.update(stockRef, { 
                 currentValue: newValue,
                 change: newChange,
@@ -87,15 +110,17 @@ export default function SwipeClient() {
           console.error("Transaction failed: ", e);
         }
 
+        // Move to the next card and reset the animation.
         setCurrentIndex((prev) => (prev + 1));
         x.set(0);
       },
     });
   };
 
+  // Memoize the current stock to be displayed, shuffling the order for variety.
   const currentStock = useMemo(() => {
     if (!stocks || stocks.length === 0) return null;
-    // Shuffle the stocks array to make the order less predictable
+    // Shuffle the stocks array to make the order less predictable on each page load.
     const shuffled = [...stocks].sort(() => Math.random() - 0.5);
     return shuffled[currentIndex % shuffled.length];
   }, [stocks, currentIndex]);

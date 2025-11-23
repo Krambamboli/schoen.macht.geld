@@ -32,11 +32,21 @@ import {
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFirebase } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Stock } from '@/lib/types';
 
+/**
+ * The main client component for the registration kiosk.
+ * It handles the entire process of creating a new stock profile:
+ * 1. Manages camera access and selection.
+ * 2. Captures a photo from the user's webcam.
+ * 3. Takes a nickname input.
+ * 4. Calls a Genkit AI flow to generate a satirical profile description.
+ * 5. Saves the complete stock profile to Firestore.
+ * @returns {JSX.Element} The rendered registration form component.
+ */
 export default function RegistrationClient() {
   const [nickname, setNickname] = useState('');
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
@@ -53,12 +63,17 @@ export default function RegistrationClient() {
   const { toast } = useToast();
   const { firestore, auth, user, isUserLoading } = useFirebase();
 
+  // On mount, if the user is not authenticated, initiate an anonymous sign-in.
+  // This is required to have permission to write to Firestore.
   useEffect(() => {
     if (!isUserLoading && !user && auth) {
       initiateAnonymousSignIn(auth);
     }
   }, [isUserLoading, user, auth]);
 
+  /**
+   * Stops all tracks of the current media stream to turn off the camera.
+   */
   const stopStream = useCallback(() => {
     setStream(currentStream => {
         if (currentStream) {
@@ -68,9 +83,11 @@ export default function RegistrationClient() {
     });
   }, []);
 
+  // On mount, get the list of available video devices.
   useEffect(() => {
     const getDevices = async () => {
       try {
+        // Request permission first.
         await navigator.mediaDevices.getUserMedia({ video: true });
         const availableDevices = (
           await navigator.mediaDevices.enumerateDevices()
@@ -78,6 +95,7 @@ export default function RegistrationClient() {
         
         setDevices(availableDevices);
         if (availableDevices.length > 0) {
+          // Check for a previously saved preferred camera in localStorage.
           const preferredDeviceId = localStorage.getItem('preferredCameraId');
           const deviceToUse =
             availableDevices.find((d) => d.deviceId === preferredDeviceId) ||
@@ -96,18 +114,20 @@ export default function RegistrationClient() {
 
     getDevices();
 
+    // Clean up the stream when the component unmounts.
     return () => {
         stopStream();
     };
   }, [stopStream]);
 
+  // Effect to handle starting and stopping the camera stream when the selected device changes.
   useEffect(() => {
     if (selectedDeviceId && !photoDataUrl) {
       localStorage.setItem('preferredCameraId', selectedDeviceId);
       let isCancelled = false;
 
       const getCameraStream = async () => {
-        stopStream();
+        stopStream(); // Stop any existing stream first.
         try {
             setError(null);
             const newStream = await navigator.mediaDevices.getUserMedia({
@@ -131,6 +151,7 @@ export default function RegistrationClient() {
       
       getCameraStream();
 
+      // Cleanup function to stop the stream if the component unmounts or dependencies change.
       return () => {
           isCancelled = true;
           setStream(currentStream => {
@@ -141,10 +162,14 @@ export default function RegistrationClient() {
           });
       }
     } else if (photoDataUrl) {
+        // If a photo has been taken, stop the stream.
         stopStream();
     }
   }, [selectedDeviceId, photoDataUrl, stopStream]);
 
+  /**
+   * Captures a frame from the video stream and saves it as a JPEG data URL.
+   */
   const handleTakePhoto = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
@@ -155,14 +180,21 @@ export default function RegistrationClient() {
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg');
       setPhotoDataUrl(dataUrl);
-      stopStream();
+      stopStream(); // Turn off camera after taking photo.
     }
   };
 
+  /**
+   * Clears the captured photo, allowing the user to take a new one.
+   */
   const handleRetakePhoto = () => {
     setPhotoDataUrl(null);
   };
 
+  /**
+   * Calls the Genkit AI flow to generate a profile description based on the
+   * user's nickname and photo.
+   */
   const handleGenerateDescription = async () => {
     if (!nickname || !photoDataUrl) {
       toast({
@@ -195,6 +227,10 @@ export default function RegistrationClient() {
     }
   };
 
+  /**
+   * Finalizes the registration process. It creates a new `Stock` object and
+   * saves it to Firestore using a non-blocking write operation.
+   */
   const handleRegister = () => {
     if (!firestore || !user) {
        toast({ variant: 'destructive', title: 'Datenbank nicht bereit', description: 'Bitte warte einen Moment und versuche es erneut.' });
@@ -215,6 +251,7 @@ export default function RegistrationClient() {
     const initialValue = 100.0;
     const docId = Date.now().toString();
 
+    // Create the new stock object with all required fields.
     const newStock: Stock = {
       id: docId,
       ticker: nickname.substring(0, 4).toUpperCase().padEnd(4, 'X'),
@@ -231,8 +268,10 @@ export default function RegistrationClient() {
     
     const docRef = doc(firestore, 'titles', docId);
 
+    // Save the new stock to Firestore without blocking the UI.
     setDocumentNonBlocking(docRef, newStock, {});
 
+    // Use a timeout to give a feeling of processing before resetting the form.
     setTimeout(() => {
       toast({
         title: 'Registrierung erfolgreich!',
