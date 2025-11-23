@@ -77,6 +77,7 @@ export default function SwipeClient() {
               const currentData = stockDoc.data() as Stock;
               const now = new Date();
               const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+              const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
               // Calculate new values.
               const newValue = currentData.currentValue + valueChange;
@@ -89,12 +90,16 @@ export default function SwipeClient() {
                 newHistory = newHistory.slice(newHistory.length - 100);
               }
 
-              // Calculate the change in the last minute.
-              const recentHistory = newHistory.filter(
-                (h) => new Date(h.timestamp) > oneMinuteAgo
-              );
-              const oldestValueInLastMinute = recentHistory.length > 0 ? recentHistory[0].value : currentData.currentValue;
+              // Find the oldest value in the last minute.
+              const recentHistory1Min = newHistory.filter((h) => new Date(h.timestamp) > oneMinuteAgo);
+              const oldestValueInLastMinute = recentHistory1Min.length > 0 ? recentHistory1Min[0].value : currentData.currentValue;
               const valueChangeLastMinute = newValue - oldestValueInLastMinute;
+
+              // Find the oldest value in the last 5 minutes.
+              const recentHistory5Min = newHistory.filter((h) => new Date(h.timestamp) > fiveMinutesAgo);
+              const oldestValueInLast5Minutes = recentHistory5Min.length > 0 ? recentHistory5Min[0].value : currentData.currentValue;
+              const valueChangeLast5Minutes = newValue - oldestValueInLast5Minutes;
+              const percentChangeLast5Minutes = (valueChangeLast5Minutes / newValue) * 100;
 
               // Update the document in the transaction.
               transaction.update(stockRef, { 
@@ -102,6 +107,8 @@ export default function SwipeClient() {
                 change: newChange,
                 percentChange: newPercentChange,
                 valueChangeLastMinute: valueChangeLastMinute,
+                valueChangeLast5Minutes: valueChangeLast5Minutes,
+                percentChangeLast5Minutes: percentChangeLast5Minutes,
                 history: newHistory,
               });
            });

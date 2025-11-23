@@ -80,7 +80,7 @@ export default function MarketMapClient() {
       ...stock,
       name: stock.nickname,
       // The size key for the treemap must be a positive number.
-      size: Math.abs(stock.currentValue) || 1,
+      size: Math.max(stock.currentValue, 1), // Ensure size is at least 1
     }));
   }, [stocks]);
 
@@ -104,13 +104,14 @@ export default function MarketMapClient() {
           formatter={(value: number, name: string, props) => {
               if (!props.payload) return null;
               
-              const payload = props.payload as Stock;
-              const isPositive = payload.change >= 0;
+              const payload = props.payload as Stock & { payload: Stock };
+              const stockData = payload.payload;
+              const isPositive = stockData.change >= 0;
 
               return [
-                   `${payload.currentValue.toFixed(2)} CHF`,
+                   `${stockData.currentValue.toFixed(2)} CHF`,
                    <span key="change" className={isPositive ? 'text-green-400' : 'text-red-500'}>
-                    {isPositive ? '+' : ''}{payload.change.toFixed(2)} ({payload.percentChange.toFixed(2)}%)
+                    {isPositive ? '+' : ''}{stockData.change.toFixed(2)} ({stockData.percentChange.toFixed(2)}%)
                    </span>
               ]
           }}
