@@ -1,26 +1,50 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { mockStocks } from '@/lib/mock-data';
 import type { Stock } from '@/lib/types';
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { Heart, X } from 'lucide-react';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import Image from 'next/image';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Heart, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function SwipeClient({
   initialStocks,
 }: {
   initialStocks: Stock[];
 }) {
-  const [stocks, setStocks] = useState(initialStocks);
+  const [stocks, setStocks] = useState<Stock[]>(initialStocks);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(true);
-  const currentStock = stocks[currentIndex];
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-  }, []);
+
+    const loadStocks = () => {
+      const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
+      if (hasRegistered) {
+        const storedStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
+        if (storedStocks.length > 0) {
+          setStocks(storedStocks);
+        } else {
+          // If local storage is empty for some reason, fall back to mock
+          setStocks(initialStocks);
+        }
+      } else {
+        setStocks(initialStocks);
+      }
+      setIsLoading(false);
+    };
+
+    loadStocks();
+    const interval = setInterval(loadStocks, 5000); // Check for new stocks every 5 seconds
+    
+    return () => clearInterval(interval);
+
+  }, [initialStocks]);
 
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-30, 30]);
@@ -29,36 +53,54 @@ export default function SwipeClient({
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    // In a real app, send the vote to the backend
-    console.log(
-      `Swiped ${direction} on ${stocks[currentIndex].nickname}. New value would be ${
-        stocks[currentIndex].value + (direction === 'right' ? 0.1 : -0.1)
-      }`
-    );
+    if (stocks.length === 0) return;
+    
+    const currentStock = stocks[currentIndex];
 
-    // Animate card out
+    const updatedStock = {
+      ...currentStock,
+      value: currentStock.value + (direction === 'right' ? 0.1 : -0.1),
+      sentiment: currentStock.sentiment + (direction === 'right' ? 1 : -1)
+    };
+
+    // Update localStorage
+    const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
+    if(hasRegistered) {
+      const allStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
+      const updatedStocks = allStocks.map((s: Stock) => s.id === updatedStock.id ? updatedStock : s);
+      localStorage.setItem('stocks', JSON.stringify(updatedStocks));
+    }
+
+
     const exitX = direction === 'right' ? 300 : -300;
     animate(x, exitX, {
       duration: 0.3,
       onComplete: () => {
-        setCurrentIndex((prev) => prev + 1);
+        // Infinite loop
+        setCurrentIndex((prev) => (prev + 1) % stocks.length);
+        x.set(0);
       },
     });
   };
 
-  useEffect(() => {
-    // Reset motion value for the next card
-    if (currentIndex < stocks.length) {
-      x.set(0);
-    }
-  }, [currentIndex, x, stocks.length]);
+  if (isLoading) {
+     return (
+      <div className="text-center flex flex-col items-center gap-4">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+        <h2 className="text-2xl font-bold">Loading Market...</h2>
+        <p className="text-muted-foreground">
+          Getting the latest stock profiles ready for you.
+        </p>
+      </div>
+    );
+  }
 
-  if (currentIndex >= stocks.length) {
+  if (stocks.length === 0) {
     return (
       <div className="text-center">
-        <h2 className="text-2xl font-bold">All stocks rated!</h2>
+        <h2 className="text-2xl font-bold">No stocks available yet!</h2>
         <p className="text-muted-foreground">
-          Check the market displays to see the results.
+          Go to the registration station to become the first stock.
         </p>
       </div>
     );

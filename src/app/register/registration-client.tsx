@@ -47,24 +47,24 @@ export default function RegistrationClient() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
-  const stopStream = useCallback((currentStream: MediaStream | null) => {
-    if (currentStream) {
-      currentStream.getTracks().forEach((track) => track.stop());
-    }
+  const stopStream = useCallback(() => {
+    // Access the stream from the state inside the callback to ensure it's the latest version.
+    setStream(currentStream => {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        return null;
+    });
   }, []);
 
   useEffect(() => {
     const getDevices = async () => {
       try {
-        // Request permission and get a stream to enumerate devices
-        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        await navigator.mediaDevices.getUserMedia({ video: true });
         const availableDevices = (
           await navigator.mediaDevices.enumerateDevices()
         ).filter((device) => device.kind === 'videoinput');
         
-        // Stop the temporary stream once we have the device list
-        stopStream(tempStream);
-
         setDevices(availableDevices);
         if (availableDevices.length > 0) {
           const preferredDeviceId = localStorage.getItem('preferredCameraId');
@@ -85,49 +85,52 @@ export default function RegistrationClient() {
 
     getDevices();
 
-    // Cleanup function for when the component unmounts
     return () => {
-        // stream is a state variable, we need to get the latest value with a function
-        setStream(current => {
-            stopStream(current);
-            return null;
-        });
+        stopStream();
     };
   }, [stopStream]);
 
   useEffect(() => {
     if (selectedDeviceId && !photoDataUrl) {
       localStorage.setItem('preferredCameraId', selectedDeviceId);
-      let newStream: MediaStream | null = null;
+      let isCancelled = false;
 
       const getCameraStream = async () => {
+        stopStream();
         try {
             setError(null);
-            newStream = await navigator.mediaDevices.getUserMedia({
+            const newStream = await navigator.mediaDevices.getUserMedia({
                 video: { deviceId: { exact: selectedDeviceId } },
             });
-            setStream(newStream);
-            if (videoRef.current) {
-                videoRef.current.srcObject = newStream;
+            if (!isCancelled) {
+              setStream(newStream);
+              if (videoRef.current) {
+                  videoRef.current.srcObject = newStream;
+              }
             }
         } catch (err) {
             console.error('Error accessing camera:', err);
-            setError(
-                'Could not access camera. Please check permissions and try again.'
-            );
+             if (!isCancelled) {
+              setError(
+                  'Could not access camera. Please check permissions and try again.'
+              );
+            }
         }
       }
       
       getCameraStream();
 
-      // Cleanup this effect
       return () => {
-          stopStream(newStream);
-          setStream(current => {
-            if (current === newStream) return null;
-            return current;
+          isCancelled = true;
+          setStream(currentStream => {
+            if (currentStream) {
+              currentStream.getTracks().forEach(track => track.stop());
+            }
+            return null;
           });
       }
+    } else if (photoDataUrl) {
+        stopStream();
     }
   }, [selectedDeviceId, photoDataUrl, stopStream]);
 
@@ -141,16 +144,12 @@ export default function RegistrationClient() {
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg');
       setPhotoDataUrl(dataUrl);
-      setStream(current => {
-          stopStream(current);
-          return null;
-      });
+      stopStream();
     }
   };
 
   const handleRetakePhoto = () => {
     setPhotoDataUrl(null);
-    // The useEffect for selectedDeviceId will automatically restart the stream
   };
 
   const handleGenerateDescription = async () => {
@@ -196,8 +195,30 @@ export default function RegistrationClient() {
     }
     
     setIsRegistering(true);
-    // In a real app, this would send the data to the backend/database
-    console.log({ nickname, photoDataUrl, description });
+    
+    // In a real app, this would send the data to the backend/database.
+    // For now, we'll store it in localStorage.
+    const newStock = {
+      id: Date.now().toString(),
+      ticker: nickname.substring(0, 4).toUpperCase().padEnd(4, 'X'),
+      nickname,
+      photoUrl: photoDataUrl,
+      description,
+      value: 100, // Initial value
+      history: [],
+      sentiment: 0,
+    };
+    
+    const existingStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
+    const firstRegistration = localStorage.getItem('firstRegistration') !== 'true';
+
+    // On first registration, clear mock data.
+    const newStockList = firstRegistration ? [newStock] : [...existingStocks, newStock];
+    
+    localStorage.setItem('stocks', JSON.stringify(newStockList));
+    if (firstRegistration) {
+      localStorage.setItem('firstRegistration', 'true');
+    }
 
     setTimeout(() => {
       toast({
