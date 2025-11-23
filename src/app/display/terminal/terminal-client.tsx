@@ -59,7 +59,8 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
     fetchHeadline(); // Initial fetch
     const interval = setInterval(fetchHeadline, 90000); // Generate a new headline every 90s
     return () => clearInterval(interval);
-  }, [fetchHeadline]);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAnimationIteration = useCallback(() => {
     if (nextHeadline) {
@@ -73,7 +74,9 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
     if (tickerElement) {
       tickerElement.addEventListener('animationiteration', handleAnimationIteration);
       return () => {
-        tickerElement.removeEventListener('animationiteration', handleAnimationIteration);
+        if (tickerElement) {
+          tickerElement.removeEventListener('animationiteration', handleAnimationIteration);
+        }
       };
     }
   }, [handleAnimationIteration]);
