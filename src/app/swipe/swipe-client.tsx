@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, X, Loader2 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, arrayUnion, runTransaction } from 'firebase/firestore';
+import { collection, doc, runTransaction } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 
 export default function SwipeClient() {
@@ -56,19 +56,29 @@ export default function SwipeClient() {
               }
 
               const currentData = stockDoc.data() as Stock;
+              const now = new Date();
+              const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+
               const newValue = currentData.currentValue + valueChange;
               const newChange = newValue - currentData.initialValue;
               const newPercentChange = (newChange / currentData.initialValue) * 100;
               
-              let newHistory = [...currentData.history, { value: newValue, timestamp: new Date().toISOString() }];
+              let newHistory = [...currentData.history, { value: newValue, timestamp: now.toISOString() }];
               if (newHistory.length > 100) {
                 newHistory = newHistory.slice(newHistory.length - 100);
               }
+
+              const recentHistory = newHistory.filter(
+                (h) => new Date(h.timestamp) > oneMinuteAgo
+              );
+              const oldestValueInLastMinute = recentHistory.length > 0 ? recentHistory[0].value : currentData.currentValue;
+              const valueChangeLastMinute = newValue - oldestValueInLastMinute;
 
               transaction.update(stockRef, { 
                 currentValue: newValue,
                 change: newChange,
                 percentChange: newPercentChange,
+                valueChangeLastMinute: valueChangeLastMinute,
                 history: newHistory,
               });
            });
@@ -85,7 +95,9 @@ export default function SwipeClient() {
 
   const currentStock = useMemo(() => {
     if (!stocks || stocks.length === 0) return null;
-    return stocks[currentIndex % stocks.length];
+    // Shuffle the stocks array to make the order less predictable
+    const shuffled = [...stocks].sort(() => Math.random() - 0.5);
+    return shuffled[currentIndex % shuffled.length];
   }, [stocks, currentIndex]);
 
   const isLoading = isLoadingStocks || isUserLoading;

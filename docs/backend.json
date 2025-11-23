@@ -43,6 +43,10 @@
           "type": "number",
           "description": "The percentage change in value since creation."
         },
+        "valueChangeLastMinute": {
+            "type": "number",
+            "description": "The net value change in the last 60 seconds."
+        },
         "history": {
           "type": "array",
           "description": "History of the last 100 value changes with timestamps.",
@@ -66,6 +70,7 @@
         "initialValue",
         "change",
         "percentChange",
+        "valueChangeLastMinute",
         "history"
       ]
     }

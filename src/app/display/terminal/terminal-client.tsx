@@ -149,6 +149,7 @@ export default function TerminalClient() {
             {sortedStocks
               .map((stock, index) => {
                 const isPositive = stock.change >= 0;
+                const changeLastMinutePositive = (stock.valueChangeLastMinute ?? 0) >= 0;
                 const rankChange = getRankChange(stock.id, index);
 
                 let RankIndicator;
@@ -182,11 +183,11 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                        stock.change === 0 ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-500'
+                        stock.valueChangeLastMinute === 0 ? 'text-gray-500' : changeLastMinutePositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      {stock.change > 0 ? '+' : ''}
-                      {stock.change.toFixed(2)}
+                      {stock.valueChangeLastMinute > 0 ? '+' : ''}
+                      {(stock.valueChangeLastMinute ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell
                       className={cn(

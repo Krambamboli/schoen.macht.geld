@@ -35,6 +35,7 @@ import { useFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Stock } from '@/lib/types';
 
 export default function RegistrationClient() {
   const [nickname, setNickname] = useState('');
@@ -214,7 +215,7 @@ export default function RegistrationClient() {
     const initialValue = 100.0;
     const docId = Date.now().toString();
 
-    const newStock = {
+    const newStock: Stock = {
       id: docId,
       ticker: nickname.substring(0, 4).toUpperCase().padEnd(4, 'X'),
       nickname,
@@ -224,6 +225,7 @@ export default function RegistrationClient() {
       initialValue: initialValue,
       change: 0,
       percentChange: 0,
+      valueChangeLastMinute: 0,
       history: [{ value: initialValue, timestamp: new Date().toISOString() }],
     };
     

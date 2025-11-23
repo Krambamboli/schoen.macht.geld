@@ -8,5 +8,6 @@ export interface Stock {
   initialValue: number;
   change: number;
   percentChange: number;
+  valueChangeLastMinute: number;
   history: { value: number, timestamp: string }[];
 }
