@@ -319,3 +319,9 @@ export default function RegistrationClient() {
           disabled={!nickname || !photoDataUrl || !description || isRegistering}
         >
           {isRegistering && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Register Your Stock
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}

@@ -19,4 +19,11 @@ export default function RegisterPage() {
           <h1 className="text-4xl font-bold font-headline">Join the Market</h1>
           <p className="text-muted-foreground text-lg">
             Create your profile to become a publicly traded entity at the
-            MachtSchön Bör
+            MachtSchön Börse.
+          </p>
+        </div>
+        <RegistrationClient />
+      </div>
+    </div>
+  );
+}
