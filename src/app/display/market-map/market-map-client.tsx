@@ -8,7 +8,7 @@ import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 type StockWithChange = Stock & { change: number; percentChange: number };
 
 const CustomizedContent = (props: any) => {
-  const { x, y, width, height, name, value, ticker, percentChange } = props;
+  const { x, y, width, height, name, value, percentChange, ticker } = props;
 
   // Don't render tiny boxes
   if (width < 50 || height < 40) {
@@ -48,7 +48,7 @@ const CustomizedContent = (props: any) => {
           <div style={{ fontSize: '0.8rem', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
           <div style={{ marginTop: 'auto', fontSize: '1.2rem', fontWeight: 'bold' }}>
               {isPositive ? '+' : ''}
-              {percentChange.toFixed(2)}%
+              {percentChange?.toFixed(2) ?? '0.00'}%
           </div>
         </div>
       </foreignObject>
