@@ -78,7 +78,6 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 
 export default function TerminalClient() {
     const [stocks, setStocks] = useState<StockWithChange[]>([]);
-    const [time, setTime] = useState<Date | null>(null);
     const initialValuesRef = useRef(new Map<string, number>());
 
     useEffect(() => {
@@ -117,13 +116,8 @@ export default function TerminalClient() {
         loadData();
         const dataInterval = setInterval(loadData, 2000);
         
-        const timeInterval = setInterval(() => {
-          setTime(new Date());
-        }, 1000);
-
         return () => {
             clearInterval(dataInterval);
-            clearInterval(timeInterval);
         };
     }, []);
 
@@ -131,12 +125,6 @@ export default function TerminalClient() {
     <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono">
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
         <h1 className="text-2xl">MSB TERMINAL</h1>
-         {time && (
-            <div className="text-lg">
-                <span>{time.toLocaleDateString()}</span>
-                <span className="ml-4">{time.toLocaleTimeString()}</span>
-            </div>
-          )}
       </div>
       <div className="flex-1 overflow-y-auto mt-2">
         <Table>
