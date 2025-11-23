@@ -1,3 +1,4 @@
+
 'use client';
 
 import { generateFunnyNewsHeadline } from '@/ai/flows/generate-funny-news-headlines';
@@ -78,7 +79,7 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 export default function TerminalClient() {
     const [stocks, setStocks] = useState<StockWithChange[]>([]);
     const [time, setTime] = useState<Date | null>(null);
-    const previousValuesRef = useRef(new Map<string, number>());
+    const initialValuesRef = useRef(new Map<string, number>());
 
     useEffect(() => {
         const loadData = () => {
@@ -92,16 +93,17 @@ export default function TerminalClient() {
                 stocksToDisplay = mockStocks;
             }
 
-            const previousValues = previousValuesRef.current;
-            const updatedStocks = stocksToDisplay.map(stock => {
-                let prevValue = previousValues.get(stock.id);
-                if (prevValue === undefined) {
-                    prevValue = stock.value;
-                    previousValues.set(stock.id, stock.value)
+            // Initialize initial values if they don't exist yet for new stocks
+            stocksToDisplay.forEach(stock => {
+                if (!initialValuesRef.current.has(stock.id)) {
+                    initialValuesRef.current.set(stock.id, stock.value);
                 }
+            });
 
-                const change = stock.value - prevValue;
-                const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
+            const updatedStocks = stocksToDisplay.map(stock => {
+                const initialValue = initialValuesRef.current.get(stock.id) ?? stock.value;
+                const change = stock.value - initialValue;
+                const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
 
                 return {
                     ...stock,
@@ -110,11 +112,6 @@ export default function TerminalClient() {
                 };
             });
             setStocks(updatedStocks);
-
-            // After processing, update the ref for the *next* interval
-            stocksToDisplay.forEach(stock => {
-                previousValues.set(stock.id, stock.value);
-            });
         };
         
         loadData();
@@ -134,14 +131,12 @@ export default function TerminalClient() {
     <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono">
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
         <h1 className="text-2xl">MSB TERMINAL</h1>
-        <div className="text-lg">
-          {time && (
-            <>
+         {time && (
+            <div className="text-lg">
                 <span>{time.toLocaleDateString()}</span>
                 <span className="ml-4">{time.toLocaleTimeString()}</span>
-            </>
+            </div>
           )}
-        </div>
       </div>
       <div className="flex-1 overflow-y-auto mt-2">
         <Table>
@@ -169,7 +164,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right font-bold',
-                        stock.change !== 0 && (isPositive ? 'text-green-400' : 'text-red-500')
+                        isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
                       ${stock.value.toFixed(2)}
@@ -177,7 +172,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                        stock.change !== 0 && (isPositive ? 'text-green-400' : 'text-red-500')
+                        isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
                       {stock.change > 0 ? '+' : ''}
@@ -186,7 +181,7 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                         stock.change !== 0 && (isPositive ? 'text-green-400' : 'text-red-500')
+                         isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
                       {stock.percentChange > 0 ? '+' : ''}

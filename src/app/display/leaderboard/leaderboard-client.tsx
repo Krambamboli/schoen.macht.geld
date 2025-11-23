@@ -1,3 +1,4 @@
+
 'use client';
 
 import { mockStocks } from '@/lib/mock-data';
@@ -11,7 +12,6 @@ type StockWithChange = Stock & { change: number; percentChange: number };
 
 export default function LeaderboardClient() {
   const [stocks, setStocks] = useState<StockWithChange[]>([]);
-  const previousValuesRef = useRef(new Map<string, number>());
   const initialValuesRef = useRef(new Map<string, number>());
 
   useEffect(() => {
@@ -26,13 +26,10 @@ export default function LeaderboardClient() {
         stocksToDisplay = mockStocks;
       }
 
-      // Initialize initial values if they don't exist
+      // Initialize initial values if they don't exist yet for new stocks
       stocksToDisplay.forEach(stock => {
         if (!initialValuesRef.current.has(stock.id)) {
             initialValuesRef.current.set(stock.id, stock.value);
-        }
-        if (!previousValuesRef.current.has(stock.id)) {
-          previousValuesRef.current.set(stock.id, stock.value);
         }
       });
 
@@ -100,7 +97,7 @@ export default function LeaderboardClient() {
                       isPositive ? <ArrowUp size={20} /> : <ArrowDown size={20} />
                     )}
                     <span>
-                      {stock.percentChange.toFixed(2)}%
+                      {isPositive ? '+' : ''}{stock.percentChange.toFixed(2)}%
                     </span>
                   </div>
                 </motion.li>

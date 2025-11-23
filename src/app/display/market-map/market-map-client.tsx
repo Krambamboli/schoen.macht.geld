@@ -1,3 +1,4 @@
+
 'use client';
 
 import { mockStocks } from '@/lib/mock-data';
@@ -59,7 +60,7 @@ const CustomizedContent = (props: any) => {
 
 export default function MarketMapClient() {
   const [data, setData] = useState<StockWithChange[]>([]);
-  const previousValuesRef = useRef(new Map<string, number>());
+  const initialValuesRef = useRef(new Map<string, number>());
 
   useEffect(() => {
      const loadData = () => {
@@ -73,37 +74,27 @@ export default function MarketMapClient() {
             stocksToDisplay = mockStocks;
         }
         
-        const previousValues = previousValuesRef.current;
+        // Initialize initial values if they don't exist yet for new stocks
+        stocksToDisplay.forEach(stock => {
+            if (!initialValuesRef.current.has(stock.id)) {
+                initialValuesRef.current.set(stock.id, stock.value);
+            }
+        });
 
         const updatedData = stocksToDisplay.map((stock: Stock) => {
-            let prevValue = previousValues.get(stock.id);
+            const initialValue = initialValuesRef.current.get(stock.id) ?? stock.value;
+            const change = stock.value - initialValue;
+            const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
             
-            if (prevValue === undefined) {
-              prevValue = stock.value;
-              previousValues.set(stock.id, stock.value);
-            }
-
-            const change = stock.value - prevValue;
-            const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
-            
-            // This was the bug: we need to update the ref with the *new* value
-            // if we want to calculate change against the last known value in the next interval.
-            // However, for the *current* render, we need the change from the previous state.
-            // The best approach is to only set the initial value and let the `value` prop drive size.
-            // The change calculation needs to be against the value from the *last poll*.
-
             return { 
                 ...stock, 
                 change,
                 percentChange,
+                // The Treemap `dataKey` should be positive to have an area
+                value: Math.abs(stock.value) || 1, 
             };
         });
         setData(updatedData);
-
-        // After processing, update the ref for the *next* interval
-        stocksToDisplay.forEach(stock => {
-            previousValues.set(stock.id, stock.value);
-        });
     };
     
     loadData(); // Initial load
@@ -116,7 +107,7 @@ export default function MarketMapClient() {
     <ResponsiveContainer width="100%" height="100%">
       <Treemap
         data={data}
-        dataKey="value"
+        dataKey="value" // Use `value` for block size
         nameKey="nickname"
         aspectRatio={16 / 9}
         content={<CustomizedContent />}
@@ -131,13 +122,29 @@ export default function MarketMapClient() {
           labelStyle={{ color: 'white' }}
           formatter={(value: number, name: string, props) => {
               const { payload } = props;
+              // The original value is not on `value` anymore, let's get it from the payload
+              const originalValue = payload.originalValue;
               const change = payload.change;
               const percentChange = payload.percentChange;
               const isPositive = change >= 0;
               return [
-                  `$${(value as number).toFixed(2)}`,
+                  `$${(originalValue as number).toFixed(2)}`,
                   `${isPositive ? '+' : ''}${change.toFixed(2)} (${percentChange.toFixed(2)}%)`
               ]
+          }}
+          // We need to add originalValue to the payload so formatter can use it
+          payloadCreator={(props) => {
+             if (props.payload && props.payload[0] && props.payload[0].payload) {
+                const stock = props.payload[0].payload;
+                return [{
+                    ...props.payload[0],
+                    payload: {
+                        ...stock,
+                        originalValue: stock.history[stock.history.length-1]?.value ?? stock.value
+                    }
+                }];
+            }
+            return [];
           }}
         />
       </Treemap>
