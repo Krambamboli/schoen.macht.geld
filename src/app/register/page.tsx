@@ -11,15 +11,14 @@ export default function RegisterPage() {
         className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to Home
+        Zurück zur Startseite
       </Link>
       <div className="w-full max-w-2xl mx-auto">
         <div className="flex flex-col items-center space-y-4 text-center mb-8">
           <Logo className="h-12 w-12 text-primary" />
-          <h1 className="text-4xl font-bold font-headline">Join the Market</h1>
+          <h1 className="text-4xl font-bold font-headline">Tritt dem Markt bei</h1>
           <p className="text-muted-foreground text-lg">
-            Create your profile to become a publicly traded entity at the
-            MachtSchön Börse.
+            Erstelle dein Profil, um eine öffentlich gehandelte Entität bei Schön. Macht. Geld. zu werden.
           </p>
         </div>
         <RegistrationClient />

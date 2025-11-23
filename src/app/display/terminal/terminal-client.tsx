@@ -18,7 +18,7 @@ import { collection } from 'firebase/firestore';
 
 const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   const [headline, setHeadline] = useState(
-    'Welcome to the MachtSchön Börse News Network.'
+    'Willkommen beim Schön. Macht. Geld. News Network.'
   );
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -45,11 +45,11 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
             `${trendingStock.ticker.toUpperCase()}: ${result.headline}`
           );
         } else {
-           setHeadline('Market is quiet... too quiet. What are you waiting for?');
+           setHeadline('Der Markt ist ruhig... zu ruhig. Worauf wartest du?');
         }
       } catch (error) {
         console.error('Failed to generate news headline:', error);
-        setHeadline('NEWS: Market is experiencing technical difficulties... or is it just feelings?');
+        setHeadline('NEWS: Der Markt hat technische Schwierigkeiten... oder sind es nur Gefühle?');
       } finally {
         setIsGenerating(false);
       }
@@ -114,7 +114,7 @@ export default function TerminalClient() {
   return (
     <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono">
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
-        <h1 className="text-2xl">MSB TERMINAL</h1>
+        <h1 className="text-2xl">SMG TERMINAL</h1>
       </div>
       <div className="flex-1 overflow-y-auto mt-2">
         <Table>
@@ -123,7 +123,7 @@ export default function TerminalClient() {
               <TableHead className="text-yellow-400 w-12"></TableHead>
               <TableHead className="text-yellow-400">TICKER</TableHead>
               <TableHead className="text-yellow-400">NICKNAME</TableHead>
-              <TableHead className="text-yellow-400 text-right">VALUE</TableHead>
+              <TableHead className="text-yellow-400 text-right">WERT</TableHead>
               <TableHead className="text-yellow-400 text-right">CHG</TableHead>
               <TableHead className="text-yellow-400 text-right">% CHG</TableHead>
             </TableRow>
@@ -160,7 +160,7 @@ export default function TerminalClient() {
                         isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      ${stock.currentValue.toFixed(2)}
+                      {stock.currentValue.toFixed(2)} CHF
                     </TableCell>
                     <TableCell
                       className={cn(

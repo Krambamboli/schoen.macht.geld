@@ -94,9 +94,9 @@ export default function SwipeClient() {
      return (
       <div className="text-center flex flex-col items-center gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
-        <h2 className="text-2xl font-bold">Loading Market...</h2>
+        <h2 className="text-2xl font-bold">Lade Markt...</h2>
         <p className="text-muted-foreground">
-          Getting the latest stock profiles ready for you.
+          Die neusten Profile werden für dich vorbereitet.
         </p>
       </div>
     );
@@ -105,9 +105,9 @@ export default function SwipeClient() {
   if (!currentStock) {
     return (
       <div className="text-center">
-        <h2 className="text-2xl font-bold">No stocks available yet!</h2>
+        <h2 className="text-2xl font-bold">Noch keine Aktien verfügbar!</h2>
         <p className="text-muted-foreground">
-          Go to the registration station to become the first stock.
+          Geh zur Registrierungsstation, um die erste Aktie zu werden.
         </p>
       </div>
     );
@@ -167,7 +167,7 @@ export default function SwipeClient() {
                   {currentStock.nickname}
                 </h2>
                 <p className="text-2xl font-mono text-green-300">
-                  ${currentStock.currentValue.toFixed(2)}
+                  {currentStock.currentValue.toFixed(2)} CHF
                 </p>
               </div>
               <p className="mt-2 text-lg text-white/80">

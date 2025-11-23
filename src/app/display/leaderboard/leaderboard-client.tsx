@@ -37,7 +37,7 @@ export default function LeaderboardClient() {
 
   return (
     <div className="h-full flex flex-col p-4 bg-black text-gray-200">
-       <h1 className="text-3xl font-bold text-center mb-4 text-white">Market Leaders</h1>
+       <h1 className="text-3xl font-bold text-center mb-4 text-white">Rangliste</h1>
       <div className="relative flex-1 overflow-y-auto">
         <ul className="space-y-2">
           <AnimatePresence>
@@ -77,7 +77,7 @@ export default function LeaderboardClient() {
                       'text-2xl font-mono font-bold text-right',
                       isPositive ? 'text-green-400' : 'text-red-500'
                     )}>
-                    ${stock.currentValue.toFixed(2)}
+                    {stock.currentValue.toFixed(2)} CHF
                   </span>
                   <div className={cn(
                       'flex items-center justify-end gap-2 text-2xl font-bold',

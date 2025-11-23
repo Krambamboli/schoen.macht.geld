@@ -1,6 +1,7 @@
 'use client';
 
 import type { Stock } from '@/lib/types';
+import { useMemo } from 'react';
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
@@ -38,7 +39,6 @@ const CustomizedContent = (props: any) => {
             flexDirection: 'column',
             justifyContent: 'flex-start',
             color: 'white',
-            textAlign: 'left',
             padding: '4px',
           }}
         >
@@ -93,7 +93,7 @@ export default function MarketMapClient() {
               const isPositive = payload.change >= 0;
 
               return [
-                   `$${payload.currentValue.toFixed(2)}`,
+                   `${payload.currentValue.toFixed(2)} CHF`,
                    <span key="change" className={isPositive ? 'text-green-400' : 'text-red-500'}>
                     {isPositive ? '+' : ''}{payload.change.toFixed(2)} ({payload.percentChange.toFixed(2)}%)
                    </span>

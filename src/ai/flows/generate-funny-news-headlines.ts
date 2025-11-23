@@ -24,7 +24,7 @@ export type GenerateFunnyNewsHeadlineInput = z.infer<
 >;
 
 const GenerateFunnyNewsHeadlineOutputSchema = z.object({
-  headline: z.string().describe('A funny news headline.'),
+  headline: z.string().describe('Eine lustige Nachrichtenschlagzeile.'),
 });
 export type GenerateFunnyNewsHeadlineOutput = z.infer<
   typeof GenerateFunnyNewsHeadlineOutputSchema
@@ -40,17 +40,17 @@ const prompt = ai.definePrompt({
   name: 'generateFunnyNewsHeadlinePrompt',
   input: {schema: GenerateFunnyNewsHeadlineInputSchema},
   output: {schema: GenerateFunnyNewsHeadlineOutputSchema},
-  prompt: `You are a financial news editor for a satirical tabloid covering a stock market party game with the theme "Geld. Macht. Schön." (Money. Power. Beauty.). Your audience is cynical, loves gossip, and enjoys dark humor related to nightlife, consumerism, and vanity.
+  prompt: `Du bist ein zynischer Finanzredakteur für ein Klatschblatt, das über das Börsen-Partyspiel "Schön. Macht. Geld." berichtet, veranstaltet vom "Verein für ambitionierten Konsum (VAK)" und "Amphitheater" in Zürich. Dein Publikum liebt Klatsch, dunklen Humor und ist fasziniert von der hedonistischen Party-Szene, Konsum, Drogen und der Absurdität, den Selbstwert an einen Aktienkurs zu koppeln.
 
-  Based on the following information, generate a short, punchy, and hilarious news headline about a person's stock profile. The tone should be sharp, ironic, and dripping with satire. Think gossip column meets financial disaster.
+  Basierend auf den folgenden Informationen, generiere eine kurze, schlagkräftige und urkomische Schlagzeile über das Börsenprofil einer Person. Der Ton sollte scharf, ironisch und voller Satire sein. Denk an eine Mischung aus Society-Klatsch und Finanz-Desaster.
 
-  Stock Ticker: {{{stockTicker}}}
-  Nickname: {{{companyName}}}
-  Profile Description: {{{description}}}
-  Current Value: \${{{currentValue}}}
-  Session Change: \${{{change}}} ({{{percentChange}}}%)
+  Börsenkürzel: {{{stockTicker}}}
+  Spitzname: {{{companyName}}}
+  Profil-Beschreibung: {{{description}}}
+  Aktueller Wert: {{{currentValue}}} CHF
+  Veränderung: {{{change}}} CHF ({{{percentChange}}}%)
 
-  Generate a headline. Be edgy and memorable. Focus on themes of social climbing, fleeting fame, bad decisions at parties, and the absurdity of linking self-worth to a stock price.`,
+  Generiere eine Schlagzeile. Sei provokant und einprägsam. Konzentriere dich auf Themen wie soziale Kletterei, vergänglichen Ruhm, schlechte Entscheidungen auf Partys, Exzesse im Zürcher Nachtleben und die Absurdität des Ganzen. Sei kreativ und nutze den Vibe von VAK und Amphitheater.`,
 });
 
 const generateFunnyNewsHeadlineFlow = ai.defineFlow(

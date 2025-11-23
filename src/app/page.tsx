@@ -12,23 +12,23 @@ import { Logo } from '@/components/icons';
 export default function Home() {
   const features = [
     {
-      title: 'Registration Station',
+      title: 'Registrierungsstation',
       description:
-        'On-site registration with nickname and live photo capture. Become a new stock on the market.',
+        'Vor-Ort-Registrierung mit Spitznamen und Live-Fotoaufnahme. Werde eine neue Aktie auf dem Markt.',
       href: '/register',
       icon: <UserPlus className="h-10 w-10" />,
     },
     {
       title: 'Stock Swipe',
       description:
-        'Kiosk-mode app for swiping stocks (profiles) left or right, influencing stock value in real-time.',
+        'Kiosk-App zum Swipen von Aktien (Profilen) nach links oder rechts, um den Aktienwert in Echtzeit zu beeinflussen.',
       href: '/swipe',
       icon: <Smartphone className="h-10 w-10" />,
     },
     {
-      title: 'Market Display',
+      title: 'Markt-Display',
       description:
-        'Live market data visualization. Includes stock tickers, market maps, and a Bloomberg-style terminal.',
+        'Live-Visualisierung der Marktdaten. Umfasst Börsenticker, Marktkarten und ein Terminal im Bloomberg-Stil.',
       href: '/display',
       icon: <Presentation className="h-10 w-10" />,
     },
@@ -40,12 +40,12 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <Logo className="h-16 w-16 text-primary" />
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-headline font-bold tracking-tighter">
-            MachtSchön <span className="text-primary">Börse</span>
+            Schön. <span className="text-primary">Macht.</span> Geld.
           </h1>
         </div>
         <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl font-body">
-          Geld. Macht. Schön. The ultimate stock market simulation party game.
-          Register, get swiped, and watch your value soar (or plummet).
+          Eine Initiative vom Verein für ambitionierten Konsum & Amphitheater.
+          Registriere dich, lass dich swipen und sieh zu, wie dein Wert steigt (oder fällt).
         </p>
       </div>
 
