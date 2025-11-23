@@ -83,12 +83,12 @@ export default function RegistrationClient() {
             availableDevices[0];
           setSelectedDeviceId(deviceToUse.deviceId);
         } else {
-            setError('No camera devices found.');
+            setError('Keine Kameras gefunden.');
         }
       } catch (err) {
         console.error("Error enumerating devices:", err)
         setError(
-          'Camera permission denied. Please allow camera access in your browser settings.'
+          'Kamerazugriff verweigert. Bitte erlaube den Kamerazugriff in deinen Browser-Einstellungen.'
         );
       }
     };
@@ -122,7 +122,7 @@ export default function RegistrationClient() {
             console.error('Error accessing camera:', err);
              if (!isCancelled) {
               setError(
-                  'Could not access camera. Please check permissions and try again.'
+                  'Kamera konnte nicht geöffnet werden. Bitte überprüfe die Berechtigungen und versuche es erneut.'
               );
             }
         }
@@ -166,8 +166,8 @@ export default function RegistrationClient() {
     if (!nickname || !photoDataUrl) {
       toast({
         variant: 'destructive',
-        title: 'Missing Information',
-        description: 'Please provide a nickname and take a photo.',
+        title: 'Fehlende Informationen',
+        description: 'Bitte gib einen Spitznamen an und mach ein Foto.',
       });
       return;
     }
@@ -183,11 +183,11 @@ export default function RegistrationClient() {
       console.error('AI generation failed:', err);
       toast({
         variant: 'destructive',
-        title: 'AI Generation Failed',
-        description: 'Could not generate a description. Please try again.',
+        title: 'KI-Generierung fehlgeschlagen',
+        description: 'Konnte keine Beschreibung generieren. Bitte versuche es erneut.',
       });
       setDescription(
-        'The AI is on a coffee break. Please write your own fabulous description.'
+        'Die KI macht gerade Kaffeepause. Bitte schreib deine eigene fabelhafte Beschreibung.'
       );
     } finally {
       setIsGenerating(false);
@@ -196,15 +196,15 @@ export default function RegistrationClient() {
 
   const handleRegister = () => {
     if (!firestore || !user) {
-       toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait a moment and try again.' });
+       toast({ variant: 'destructive', title: 'Datenbank nicht bereit', description: 'Bitte warte einen Moment und versuche es erneut.' });
        return;
     }
 
     if (!nickname || !photoDataUrl || !description) {
        toast({
         variant: 'destructive',
-        title: 'Registration Incomplete',
-        description: 'Please fill out all fields before registering.',
+        title: 'Registrierung unvollständig',
+        description: 'Bitte fülle alle Felder aus, bevor du dich registrierst.',
       });
       return;
     }
@@ -233,8 +233,8 @@ export default function RegistrationClient() {
 
     setTimeout(() => {
       toast({
-        title: 'Registration Successful!',
-        description: `${nickname} is now trading on the MachtSchön Börse.`,
+        title: 'Registrierung erfolgreich!',
+        description: `${nickname} wird jetzt an der Schön. Macht. Geld. Börse gehandelt.`,
       });
       // Reset form for the next person
       setNickname('');
@@ -247,9 +247,9 @@ export default function RegistrationClient() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Create Your Stock Profile</CardTitle>
+        <CardTitle>Erstelle dein Börsenprofil</CardTitle>
         <CardDescription>
-          Your nickname and photo will be used to generate your stock profile.
+          Dein Spitzname und Foto werden verwendet, um dein Aktienprofil zu erstellen.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -257,11 +257,11 @@ export default function RegistrationClient() {
         <div className="space-y-4">
           <div>
             <Label htmlFor="nickname" className="flex items-center gap-2 mb-2">
-              <User className="w-4 h-4" /> Nickname
+              <User className="w-4 h-4" /> Spitzname
             </Label>
             <Input
               id="nickname"
-              placeholder="e.g., DiamondHands"
+              placeholder="z.B., Koks-Kevin"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               disabled={!!photoDataUrl}
@@ -269,13 +269,13 @@ export default function RegistrationClient() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="camera" className="flex items-center gap-2">
-              <Camera className="w-4 h-4" /> Camera
+              <Camera className="w-4 h-4" /> Kamera
             </Label>
             <div className="aspect-video w-full rounded-md overflow-hidden bg-muted border relative flex items-center justify-center">
               {photoDataUrl ? (
                 <Image
                   src={photoDataUrl}
-                  alt="Your photo"
+                  alt="Dein Foto"
                   layout="fill"
                   objectFit="cover"
                 />
@@ -304,12 +304,12 @@ export default function RegistrationClient() {
               disabled={devices.length === 0 || !!photoDataUrl}
             >
               <SelectTrigger id="camera">
-                <SelectValue placeholder="Select camera..." />
+                <SelectValue placeholder="Kamera auswählen..." />
               </SelectTrigger>
               <SelectContent>
                 {devices.map((device) => (
                   <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Camera ${devices.indexOf(device) + 1}`}
+                    {device.label || `Kamera ${devices.indexOf(device) + 1}`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -321,11 +321,11 @@ export default function RegistrationClient() {
                 onClick={handleRetakePhoto}
                 className="w-full"
               >
-                <RefreshCw className="mr-2 h-4 w-4" /> Retake Photo
+                <RefreshCw className="mr-2 h-4 w-4" /> Foto wiederholen
               </Button>
             ) : (
               <Button onClick={handleTakePhoto} className="w-full" disabled={!stream}>
-                <Camera className="mr-2 h-4 w-4" /> Take Photo
+                <Camera className="mr-2 h-4 w-4" /> Foto aufnehmen
               </Button>
             )}
           </div>
@@ -337,12 +337,11 @@ export default function RegistrationClient() {
             htmlFor="description"
             className="flex items-center gap-2"
           >
-            <Sparkles className="w-4 h-4 text-primary" /> AI Generated
-            Description
+            <Sparkles className="w-4 h-4 text-primary" /> KI-generierte Beschreibung
           </Label>
           <Textarea
             id="description"
-            placeholder="Generate a description or write your own..."
+            placeholder="Generiere eine Beschreibung oder schreibe deine eigene..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={8}
@@ -357,7 +356,7 @@ export default function RegistrationClient() {
             ) : (
               <Sparkles className="mr-2 h-4 w-4" />
             )}
-            Generate with AI
+            Mit KI generieren
           </Button>
         </div>
       </CardContent>
@@ -369,7 +368,7 @@ export default function RegistrationClient() {
           disabled={!nickname || !photoDataUrl || !description || isRegistering || isUserLoading || !user}
         >
           {isRegistering && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Register Your Stock
+          Deine Aktie registrieren
         </Button>
       </CardFooter>
     </Card>

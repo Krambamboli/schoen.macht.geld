@@ -1,7 +1,7 @@
 'use client';
 
 import type { Stock } from '@/lib/types';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
@@ -22,7 +22,7 @@ const StockTicker = () => {
     return (
       <div className="w-full bg-gray-900 text-white h-full flex items-center justify-center">
         <span className="text-2xl font-mono font-bold text-gray-400">
-          Waiting for market data...
+          Warte auf Marktdaten...
         </span>
       </div>
     );
@@ -52,7 +52,7 @@ const StockTicker = () => {
                   isPositive ? 'text-green-400' : 'text-red-400'
                 }`}
               >
-                ${stock.currentValue.toFixed(2)}
+                {stock.currentValue.toFixed(2)} CHF
               </span>
               <span
                 className={`ml-2 text-lg ${

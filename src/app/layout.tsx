@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'MachtSchön Börse',
-  description: 'Geld. Macht. Schön. The stock market party simulation.',
+  title: 'Schön. Macht. Geld.',
+  description: 'Das ultimative Börsensimulations-Partyspiel von VAK & Amphitheater.',
 };
 
 const poppins = Poppins({

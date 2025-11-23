@@ -22,7 +22,7 @@ const GenerateProfileDescriptionInputSchema = z.object({
 export type GenerateProfileDescriptionInput = z.infer<typeof GenerateProfileDescriptionInputSchema>;
 
 const GenerateProfileDescriptionOutputSchema = z.object({
-  description: z.string().describe('The generated profile description.'),
+  description: z.string().describe('Die generierte Profilbeschreibung.'),
 });
 export type GenerateProfileDescriptionOutput = z.infer<typeof GenerateProfileDescriptionOutputSchema>;
 
@@ -36,15 +36,14 @@ const prompt = ai.definePrompt({
   name: 'generateProfileDescriptionPrompt',
   input: {schema: GenerateProfileDescriptionInputSchema},
   output: {schema: GenerateProfileDescriptionOutputSchema},
-  prompt: `You are a creative marketing specialist tasked with creating funny and engaging profile descriptions for a stock market simulation game with the theme \"Geld. Macht. Sch\u00f6n.\" (Money. Power. Beauty.).
+  prompt: `Du bist ein kreativer Marketing-Spezialist, der witzige und bissige Profilbeschreibungen für das Börsensimulationsspiel "Schön. Macht. Geld." erstellt. Das Spiel findet im Rahmen einer exzessiven Party statt, die vom "Verein für ambitionierten Konsum (VAK)" und dem Club "Amphitheater" in Zürich veranstaltet wird. Das Motto ist hedonistischer Konsum, Macht und Schönheit.
 
-  Generate a profile description for the user based on their nickname and photo.
+  Generiere eine Profilbeschreibung für den Benutzer basierend auf seinem Spitznamen und seinem Foto.
 
-  Nickname: {{{nickname}}}
-  Photo: {{media url=photoDataUri}}
+  Spitzname: {{{nickname}}}
+  Foto: {{media url=photoDataUri}}
 
-  The description should be sarcastic, ironic, and reflect the theme of \"Geld. Macht. Sch\u00f6n.\".  It should be no more than 100 words.
-`,
+  Die Beschreibung sollte sarkastisch, ironisch und auf Deutsch sein. Sie soll das Thema "Schön. Macht. Geld." und den Vibe des Zürcher Nachtlebens, Konsum und der Party-Exzesse widerspiegeln. Die Beschreibung darf nicht mehr als 100 Wörter umfassen. Sei kreativ und spiele mit Klischees.`,
 });
 
 const generateProfileDescriptionFlow = ai.defineFlow(

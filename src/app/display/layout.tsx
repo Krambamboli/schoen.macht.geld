@@ -17,10 +17,10 @@ export default function DisplayLayout({
   const activeTab = pathname.split('/').pop() || 'ticker';
 
   const navItems = [
-    { id: 'ticker', label: 'Stock Ticker', href: '/display', icon: CandlestickChart },
-    { id: 'market-map', label: 'Market Map', href: '/display/market-map', icon: BarChart2 },
-    { id: 'terminal', label: 'Bloomberg Terminal', href: '/display/terminal', icon: Tv2 },
-    { id: 'leaderboard', label: 'Leaderboard', href: '/display/leaderboard', icon: TrendingUp },
+    { id: 'ticker', label: 'Börsenticker', href: '/display', icon: CandlestickChart },
+    { id: 'market-map', label: 'Marktübersicht', href: '/display/market-map', icon: BarChart2 },
+    { id: 'terminal', label: 'Terminal', href: '/display/terminal', icon: Tv2 },
+    { id: 'leaderboard', label: 'Rangliste', href: '/display/leaderboard', icon: TrendingUp },
   ];
 
   return (
@@ -29,7 +29,7 @@ export default function DisplayLayout({
         <Link href="/" className="flex items-center gap-3">
           <Logo className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-bold text-white font-headline tracking-wide">
-            MachtSchön <span className="text-primary">Börse</span>
+          Schön. <span className="text-primary">Macht.</span> Geld.
           </h1>
         </Link>
         <Tabs value={activeTab} className="w-auto">
