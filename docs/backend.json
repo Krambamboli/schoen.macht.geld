@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "Title": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Title",
+      "type": "object",
+      "description": "Represents a tradable asset (stock/profile) within the MachtSchön Börse simulation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Title entity."
+        },
+        "nickname": {
+          "type": "string",
+          "description": "The user-defined nickname for the title/profile."
+        },
+        "photo": {
+          "type": "string",
+          "description": "URL or data URI representing the profile photo taken during registration.",
+          "format": "uri"
+        },
+        "description": {
+          "type": "string",
+          "description": "AI-generated description of the stock/profile."
+        },
+        "currentValue": {
+          "type": "number",
+          "description": "The current market value of the title."
+        },
+        "overallChangePercent": {
+          "type": "number",
+          "description": "Overall percentage change in value since registration."
+        },
+        "history": {
+          "type": "array",
+          "description": "History of the last 100 value changes with timestamps.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "changePercentLast10Minutes": {
+          "type": "number",
+          "description": "Percentage change in value over the last 10 minutes."
+        },
+        "valueChangeLastMinute": {
+          "type": "number",
+          "description": "Change in value over the last minute."
+        }
+      },
+      "required": [
+        "id",
+        "nickname",
+        "photo",
+        "description",
+        "currentValue",
+        "overallChangePercent",
+        "history",
+        "changePercentLast10Minutes",
+        "valueChangeLastMinute"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/titles/{titleId}",
+        "definition": {
+          "entityName": "Title",
+          "schema": {
+            "$ref": "#/backend/entities/Title"
+          },
+          "description": "Stores the history, current value, and metadata for each title in the MachtSchön Börse simulation.",
+          "params": [
+            {
+              "name": "titleId",
+              "description": "Unique identifier for the Title entity."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure prioritizes data restoration capabilities and efficient market data display while adhering to the core design principles. All data is stored in a single collection `titles` to simplify querying and restoration. This collection stores all the necessary information for each title, including its real-time value changes, history, and metadata.\n\n**Authorization Independence:** No role-based access control is needed as all titles are publicly available. Since authorization is not a concern, denormalization is not necessary for this use case.\n\n**QAPs (Rules are not Filters):** Since listing and reading titles is a public function, there are no QAPs to consider for `list` operations.\n\n**Scalability:** Storing all titles in a single collection `titles` is suitable for the expected scale of a party simulation. The `history` field is capped at 100 entries to limit document size.\n\n**Debuggability:** The explicit fields for `currentValue`, `overallChangePercent`, `changePercentLast10Minutes`, and `valueChangeLastMinute` provide a clear and auditable record of each title's performance. The timestamped history provides further insights into past changes."
+  }
+}
