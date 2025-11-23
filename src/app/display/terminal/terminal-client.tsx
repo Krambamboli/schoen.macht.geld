@@ -81,9 +81,6 @@ export default function TerminalClient() {
     const previousValuesRef = useRef(new Map<string, number>());
 
     useEffect(() => {
-        // Mount time on client
-        setTime(new Date());
-
         const loadData = () => {
             const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
             let stocksToDisplay: Stock[];
@@ -101,7 +98,15 @@ export default function TerminalClient() {
                 if (prevValue === undefined) {
                     prevValue = stock.value;
                 }
-                previousValues.set(stock.id, stock.value);
+                
+                if (previousValues.get(stock.id) !== stock.value) {
+                    if (!previousValues.has(stock.id)) {
+                         previousValues.set(stock.id, stock.value);
+                    } else {
+                         previousValues.set(stock.id, stock.value);
+                    }
+                }
+
 
                 const change = stock.value - prevValue;
                 const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
@@ -118,7 +123,10 @@ export default function TerminalClient() {
         
         loadData();
         const dataInterval = setInterval(loadData, 2000);
-        const timeInterval = setInterval(() => setTime(new Date()), 1000);
+        
+        const timeInterval = setInterval(() => {
+          setTime(new Date());
+        }, 1000);
 
         return () => {
             clearInterval(dataInterval);
