@@ -14,7 +14,9 @@ import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 
-const NewsTicker = ({ stocks }: { stocks: (Stock & { change: number })[] }) => {
+type StockWithChange = Stock & { change: number; percentChange: number; prevValue: number };
+
+const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
   const [headline, setHeadline] = useState(
     'Welcome to the MachtSchön Börse News Network.'
   );
@@ -74,34 +76,52 @@ const NewsTicker = ({ stocks }: { stocks: (Stock & { change: number })[] }) => {
 };
 
 export default function TerminalClient() {
-  const [stocks, setStocks] = useState(
-    mockStocks.map((s) => ({ ...s, change: 0, prevValue: s.value }))
-  );
-  const [time, setTime] = useState(new Date());
+    const [stocks, setStocks] = useState<StockWithChange[]>([]);
+    const [time, setTime] = useState(new Date());
 
-  useEffect(() => {
-    const dataInterval = setInterval(() => {
-      setStocks((prevStocks) =>
-        prevStocks.map((stock) => {
-          const changeFactor = (Math.random() - 0.48); 
-          const newValue = Math.max(1, stock.value + changeFactor);
-          return {
-            ...stock,
-            prevValue: stock.value,
-            value: newValue,
-            change: ((newValue - stock.prevValue) / stock.prevValue) * 100,
-          };
-        })
-      );
-    }, 2000);
+    useEffect(() => {
+        const previousValues = new Map<string, number>();
 
-    const timeInterval = setInterval(() => setTime(new Date()), 1000);
+        const loadData = () => {
+            const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
+            let stocksToDisplay: Stock[];
 
-    return () => {
-      clearInterval(dataInterval);
-      clearInterval(timeInterval);
-    };
-  }, []);
+            if (hasRegistered) {
+                const storedStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
+                stocksToDisplay = storedStocks.length > 0 ? storedStocks : mockStocks;
+            } else {
+                stocksToDisplay = mockStocks;
+            }
+
+            setStocks(prevStocks => {
+                const updatedStocks = stocksToDisplay.map(stock => {
+                    const prevStock = prevStocks.find(s => s.id === stock.id);
+                    const prevValue = prevStock ? prevStock.value : (previousValues.get(stock.id) || stock.value);
+                    const change = stock.value - prevValue;
+                    const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
+                    
+                    previousValues.set(stock.id, stock.value);
+
+                    return {
+                        ...stock,
+                        prevValue: prevValue,
+                        change: change,
+                        percentChange: percentChange,
+                    };
+                });
+                return updatedStocks;
+            });
+        };
+        
+        loadData();
+        const dataInterval = setInterval(loadData, 2000);
+        const timeInterval = setInterval(() => setTime(new Date()), 1000);
+
+        return () => {
+            clearInterval(dataInterval);
+            clearInterval(timeInterval);
+        };
+    }, []);
 
   return (
     <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono">
@@ -127,9 +147,7 @@ export default function TerminalClient() {
             {stocks
               .sort((a, b) => b.value - a.value)
               .map((stock) => {
-                const isPositive = stock.value >= stock.prevValue;
-                const valueChange = stock.value - stock.prevValue;
-                const percentChange = stock.change;
+                const isPositive = stock.change >= 0;
                 return (
                   <TableRow
                     key={stock.id}
@@ -152,7 +170,7 @@ export default function TerminalClient() {
                       )}
                     >
                       {isPositive ? '+' : ''}
-                      {valueChange.toFixed(2)}
+                      {stock.change.toFixed(2)}
                     </TableCell>
                     <TableCell
                       className={cn(
@@ -161,7 +179,7 @@ export default function TerminalClient() {
                       )}
                     >
                       {isPositive ? '+' : ''}
-                      {percentChange.toFixed(2)}%
+                      {stock.percentChange.toFixed(2)}%
                     </TableCell>
                   </TableRow>
                 );

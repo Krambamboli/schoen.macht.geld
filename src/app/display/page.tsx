@@ -5,22 +5,36 @@ import type { Stock } from "@/lib/types";
 import { useEffect, useState } from "react";
 
 const StockTicker = () => {
-    const [stocks, setStocks] = useState<Stock[]>(mockStocks);
+    const [stocks, setStocks] = useState<Stock[]>([]);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setStocks(prevStocks => 
-                prevStocks.map(stock => {
-                    const change = (Math.random() - 0.45) * 0.5;
-                    const newValue = Math.max(0, stock.value + change);
-                    return { ...stock, value: newValue };
-                })
-            );
-        }, 2000);
+        const loadData = () => {
+            const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
+            let stocksToDisplay;
+            if (hasRegistered) {
+                const storedStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
+                stocksToDisplay = storedStocks.length > 0 ? storedStocks : mockStocks;
+            } else {
+                stocksToDisplay = mockStocks;
+            }
+            setStocks(stocksToDisplay);
+        };
+
+        loadData();
+        const interval = setInterval(loadData, 2000); // Poll for updates every 2 seconds
 
         return () => clearInterval(interval);
     }, []);
 
+    if (stocks.length === 0) {
+        return (
+            <div className="w-full bg-gray-900 text-white h-full flex items-center justify-center">
+                <span className="text-2xl font-mono font-bold text-gray-400">Waiting for market data...</span>
+            </div>
+        );
+    }
+    
+    // Repeat the stocks to create a seamless loop
     const repeatedStocks = [...stocks, ...stocks];
 
     return (
@@ -28,12 +42,12 @@ const StockTicker = () => {
             <div className="flex animate-marquee whitespace-nowrap">
                 {repeatedStocks.map((stock, index) => (
                     <div key={`${stock.id}-${index}`} className="flex items-center mx-6">
-                        <span className="text-2xl font-mono font-bold text-gray-400">{stock.ticker}</span>
-                        <span className={`text-2xl font-mono font-bold ml-3 ${stock.value > 100 ? 'text-green-400' : 'text-red-400'}`}>
+                        <span className="text-2xl font-mono font-bold text-gray-400">{stock.nickname}</span>
+                        <span className={`text-2xl font-mono font-bold ml-3 ${stock.sentiment >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             ${stock.value.toFixed(2)}
                         </span>
-                        <span className={`ml-2 text-lg ${stock.value > 100 ? 'text-green-400' : 'text-red-400'}`}>
-                           {stock.value > 100 ? '▲' : '▼'}
+                        <span className={`ml-2 text-lg ${stock.sentiment >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                           {stock.sentiment >= 0 ? '▲' : '▼'}
                         </span>
                     </div>
                 ))}
@@ -44,7 +58,7 @@ const StockTicker = () => {
                     100% { transform: translateX(-50%); }
                 }
                 .animate-marquee {
-                    animation: marquee 60s linear infinite;
+                    animation: marquee ${stocks.length * 10}s linear infinite;
                 }
             `}</style>
         </div>

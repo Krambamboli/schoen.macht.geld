@@ -5,15 +5,17 @@ import type { Stock } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 
+type StockWithChange = Stock & { change: number; percentChange: number };
+
 const CustomizedContent = (props: any) => {
-  const { root, depth, x, y, width, height, index, colors, name, value } = props;
+  const { x, y, width, height, name } = props;
   
   // The actual data object from our `data` array is in `props.payload`
-  const stockData = props.payload;
+  const stockData = props.payload as StockWithChange | undefined;
   if (!stockData) return null;
 
-  const change = stockData.change || 0;
-  const isPositive = change >= 0;
+  const { value, ticker, percentChange } = stockData;
+  const isPositive = percentChange >= 0;
 
   return (
     <g>
@@ -43,14 +45,14 @@ const CustomizedContent = (props: any) => {
         >
           <div>
             <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{name}</div>
-            <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{stockData.ticker}</div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{ticker}</div>
           </div>
           <div>
             <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
               ${value.toFixed(2)}
             </div>
             <div style={{ color: isPositive ? '#A7F3D0' : '#FECACA' }}>
-              {isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+              {isPositive ? '▲' : '▼'} {Math.abs(percentChange).toFixed(2)}%
             </div>
           </div>
         </div>
@@ -60,23 +62,42 @@ const CustomizedContent = (props: any) => {
 };
 
 export default function MarketMapClient() {
-  const [data, setData] = useState<(Stock & { change: number })[]>([]);
+  const [data, setData] = useState<StockWithChange[]>([]);
 
   useEffect(() => {
+     const previousValues = new Map<string, number>();
+
      const loadData = () => {
-      const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
-      let stocksToDisplay;
-      if (hasRegistered) {
-        const storedStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
-        stocksToDisplay = storedStocks.length > 0 ? storedStocks : mockStocks;
-      } else {
-        stocksToDisplay = mockStocks;
-      }
-      setData(stocksToDisplay.map((s: Stock) => ({ ...s, change: s.sentiment })));
+        const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
+        let stocksToDisplay: Stock[];
+
+        if (hasRegistered) {
+            const storedStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
+            stocksToDisplay = storedStocks.length > 0 ? storedStocks : mockStocks;
+        } else {
+            stocksToDisplay = mockStocks;
+        }
+
+        setData(prevData => {
+            return stocksToDisplay.map((stock: Stock) => {
+                const prevStock = prevData.find(s => s.id === stock.id);
+                const prevValue = prevStock ? prevStock.value : (previousValues.get(stock.id) || stock.value);
+                const change = stock.value - prevValue;
+                const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
+                
+                previousValues.set(stock.id, stock.value);
+
+                return { 
+                    ...stock, 
+                    change: change,
+                    percentChange: percentChange,
+                };
+            });
+        });
     };
     
     loadData(); // Initial load
-    const dataInterval = setInterval(loadData, 3000); // Refresh data every 3 seconds
+    const dataInterval = setInterval(loadData, 2000); // Refresh data every 2 seconds
 
     return () => clearInterval(dataInterval);
   }, []);
