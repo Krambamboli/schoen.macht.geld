@@ -1,3 +1,38 @@
 {
-  "placeholderImages": []
-}
+  "placeholderImages": [
+    {
+      "id": "person-1",
+      "description": "A smiling person",
+      "imageUrl": "https://picsum.photos/seed/person1/400/400",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "person-2",
+      "description": "A person looking thoughtful",
+      "imageUrl": "https://picsum.photos/seed/person2/400/400",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "person-3",
+      "description": "A person in a cityscape",
+      "imageUrl": "https://picsum.photos/seed/person3/400/400",
+      "imageHint": "person city"
+    },
+    {
+      "id": "person-4",
+      "description": "A person with a bright background",
+      "imageUrl": "https://picsum.photos/seed/person4/400/400",
+      "imageHint": "person colorful"
+    },
+    {
+      "id": "person-5",
+      "description": "A person in nature",
+      "imageUrl": "https://picsum.photos/seed/person5/400/400",
+      "imageHint": "person nature"
+    },
+    {
+      "id": "person-6",
+      "description": "A silhouette of a person",
+      "imageUrl": "https://picsum.photos/seed/person6/400/400",
+      "imageHint": "person silhouette"
+    }
