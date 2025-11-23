@@ -77,10 +77,13 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 
 export default function TerminalClient() {
     const [stocks, setStocks] = useState<StockWithChange[]>([]);
-    const [time, setTime] = useState(new Date());
+    const [time, setTime] = useState<Date | null>(null);
     const previousValuesRef = useRef(new Map<string, number>());
 
     useEffect(() => {
+        // Mount time on client
+        setTime(new Date());
+
         const loadData = () => {
             const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
             let stocksToDisplay: Stock[];
@@ -97,17 +100,11 @@ export default function TerminalClient() {
                 let prevValue = previousValues.get(stock.id);
                 if (prevValue === undefined) {
                     prevValue = stock.value;
-                    previousValues.set(stock.id, prevValue);
                 }
+                previousValues.set(stock.id, stock.value);
 
                 const change = stock.value - prevValue;
                 const percentChange = prevValue === 0 ? 0 : (change / prevValue) * 100;
-                
-                if (stock.value !== prevValue) {
-                   // This is where the magic happens for continuous updates.
-                   // We only update the map when the value from localStorage is different
-                   // but for calculation, we use the value from the last known state.
-                }
 
                 return {
                     ...stock,
@@ -134,8 +131,12 @@ export default function TerminalClient() {
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
         <h1 className="text-2xl">MSB TERMINAL</h1>
         <div className="text-lg">
-          <span>{time.toLocaleDateString()}</span>
-          <span className="ml-4">{time.toLocaleTimeString()}</span>
+          {time && (
+            <>
+                <span>{time.toLocaleDateString()}</span>
+                <span className="ml-4">{time.toLocaleTimeString()}</span>
+            </>
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-y-auto mt-2">
