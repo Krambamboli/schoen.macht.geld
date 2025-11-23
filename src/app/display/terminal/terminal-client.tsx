@@ -1,4 +1,3 @@
-
 'use client';
 
 import { generateFunnyNewsHeadline } from '@/ai/flows/generate-funny-news-headlines';
@@ -14,10 +13,10 @@ import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
-type StockWithChange = Stock & { change: number; percentChange: number };
-
-const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
+const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   const [headline, setHeadline] = useState(
     'Welcome to the MachtSchön Börse News Network.'
   );
@@ -25,11 +24,10 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 
   useEffect(() => {
     const fetchHeadline = async () => {
-      if (isGenerating || stocks.length === 0) return;
+      if (isGenerating || !stocks || stocks.length === 0) return;
 
       setIsGenerating(true);
       try {
-        // Find a "trending" stock (e.g., biggest change)
         const trendingStock = [...stocks].sort(
           (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
         )[0];
@@ -39,7 +37,7 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
             stockTicker: trendingStock.ticker,
             companyName: trendingStock.nickname,
             description: trendingStock.description,
-            currentValue: trendingStock.value,
+            currentValue: trendingStock.currentValue,
             change: trendingStock.change,
             percentChange: trendingStock.percentChange,
           });
@@ -57,14 +55,14 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
       }
     };
 
-    // Don't fetch on first render, wait for some data
-    if (stocks.length > 0) {
+    if (stocks && stocks.length > 0) {
         fetchHeadline();
     }
 
-    const interval = setInterval(fetchHeadline, 15000); // Generate new headline every 15 seconds
+    const interval = setInterval(fetchHeadline, 15000);
     return () => clearInterval(interval);
   }, [stocks, isGenerating]);
+
 
   return (
     <div className="w-full bg-red-700 text-white h-10 flex items-center overflow-hidden">
@@ -75,14 +73,10 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
        <style jsx>{`
         @keyframes marquee-fast {
             from { transform: translateX(0); }
-            to { transform: translateX(-100%); }
+            to { transform: translateX(-50%); }
         }
         .animate-marquee-fast {
-            display: inline-block;
             animation: marquee-fast 30s linear infinite;
-        }
-        .animate-marquee-fast > span {
-          display: inline-block;
         }
       `}</style>
     </div>
@@ -90,31 +84,12 @@ const NewsTicker = ({ stocks }: { stocks: StockWithChange[] }) => {
 };
 
 export default function TerminalClient() {
-    const [stocks, setStocks] = useState<StockWithChange[]>([]);
+    const { firestore } = useFirebase();
+    const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
+    const { data: stocks } = useCollection<Stock>(titlesCollection);
     const prevRanksRef = useRef<Map<string, number>>(new Map());
 
-    useEffect(() => {
-        const loadData = () => {
-            const storedStocks: Stock[] = JSON.parse(localStorage.getItem('stocks') || '[]');
-            
-            const stocksWithChange = storedStocks.map(s => ({
-                ...s,
-                change: s.change || 0,
-                percentChange: s.percentChange || 0,
-            }));
-
-            setStocks(stocksWithChange as StockWithChange[]);
-        };
-        
-        loadData();
-        const dataInterval = setInterval(loadData, 2000);
-        
-        return () => {
-            clearInterval(dataInterval);
-        };
-    }, []);
-
-    const sortedStocks = stocks.sort((a, b) => b.value - a.value);
+    const sortedStocks = stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
 
     const currentRanks = new Map<string, number>();
     sortedStocks.forEach((stock, index) => {
@@ -131,7 +106,6 @@ export default function TerminalClient() {
       return 'same';
     };
     
-    // Update previous ranks after render
     useEffect(() => {
       prevRanksRef.current = currentRanks;
     });
@@ -186,7 +160,7 @@ export default function TerminalClient() {
                         isPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      ${stock.value.toFixed(2)}
+                      ${stock.currentValue.toFixed(2)}
                     </TableCell>
                     <TableCell
                       className={cn(
@@ -213,7 +187,7 @@ export default function TerminalClient() {
         </Table>
       </div>
       <div className="mt-auto">
-        <NewsTicker stocks={stocks} />
+        <NewsTicker stocks={stocks || []} />
       </div>
     </div>
   );

@@ -4,9 +4,9 @@ export interface Stock {
   nickname: string;
   photoUrl: string;
   description: string;
-  value: number;
-  history: { date: string; value: number }[];
-  sentiment: number; // sum of +1 for right swipe, -1 for left
+  currentValue: number;
+  initialValue: number;
   change: number;
   percentChange: number;
+  history: { value: number, timestamp: string }[];
 }

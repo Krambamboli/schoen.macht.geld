@@ -1,40 +1,24 @@
 'use client';
 
-import { mockStocks } from '@/lib/mock-data';
 import type { Stock } from '@/lib/types';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 const StockTicker = () => {
-  const [stocks, setStocks] = useState<Stock[]>([]);
-
-  useEffect(() => {
-    const loadData = () => {
-      const hasRegistered = localStorage.getItem('firstRegistration') === 'true';
-      let stocksToDisplay;
-      if (hasRegistered) {
-        const storedStocks = JSON.parse(localStorage.getItem('stocks') || '[]');
-        stocksToDisplay = storedStocks.length > 0 ? storedStocks : mockStocks;
-      } else {
-        stocksToDisplay = mockStocks;
-      }
-      setStocks(stocksToDisplay);
-    };
-
-    loadData();
-    const interval = setInterval(loadData, 2000); // Poll for updates every 2 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  const { firestore } = useFirebase();
+  const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
+  const { data: stocks, isLoading } = useCollection<Stock>(titlesCollection);
 
   const repeatedStocks = useMemo(() => {
-     if (stocks.length === 0) return [];
+    if (!stocks || stocks.length === 0) return [];
     // Ensure the list is long enough for a seamless loop
     const repeatCount = Math.max(2, Math.ceil(40 / stocks.length));
     return Array(repeatCount).fill(stocks).flat();
   }, [stocks]);
 
 
-  if (stocks.length === 0) {
+  if (isLoading || !stocks) {
     return (
       <div className="w-full bg-gray-900 text-white h-full flex items-center justify-center">
         <span className="text-2xl font-mono font-bold text-gray-400">
@@ -45,7 +29,7 @@ const StockTicker = () => {
   }
 
   // Calculate a dynamic duration based on the number of original items
-  const animationDuration = stocks.length * 5;
+  const animationDuration = (stocks?.length || 10) * 5;
 
   return (
     <div className="w-full bg-gray-900 text-white h-full flex items-center overflow-hidden">
@@ -53,30 +37,33 @@ const StockTicker = () => {
         className="flex animate-marquee whitespace-nowrap"
         style={{ animationDuration: `${animationDuration}s` }}
       >
-        {repeatedStocks.map((stock, index) => (
-          <div
-            key={`${stock.id}-${index}`}
-            className="flex items-center mx-6"
-          >
-            <span className="text-2xl font-mono font-bold text-gray-400">
-              {stock.nickname}
-            </span>
-            <span
-              className={`text-2xl font-mono font-bold ml-3 ${
-                stock.sentiment >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}
+        {repeatedStocks.map((stock, index) => {
+          const isPositive = stock.change >= 0;
+          return (
+            <div
+              key={`${stock.id}-${index}`}
+              className="flex items-center mx-6"
             >
-              ${stock.value.toFixed(2)}
-            </span>
-            <span
-              className={`ml-2 text-lg ${
-                stock.sentiment >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}
-            >
-              {stock.sentiment > 0 ? '▲' : stock.sentiment < 0 ? '▼' : ''}
-            </span>
-          </div>
-        ))}
+              <span className="text-2xl font-mono font-bold text-gray-400">
+                {stock.nickname}
+              </span>
+              <span
+                className={`text-2xl font-mono font-bold ml-3 ${
+                  isPositive ? 'text-green-400' : 'text-red-400'
+                }`}
+              >
+                ${stock.currentValue.toFixed(2)}
+              </span>
+              <span
+                className={`ml-2 text-lg ${
+                  isPositive ? 'text-green-400' : 'text-red-400'
+                }`}
+              >
+                {stock.change > 0 ? '▲' : stock.change < 0 ? '▼' : ''}
+              </span>
+            </div>
+          );
+        })}
       </div>
       <style jsx>{`
         @keyframes marquee {

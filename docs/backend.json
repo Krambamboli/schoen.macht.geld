@@ -14,9 +14,13 @@
           "type": "string",
           "description": "The user-defined nickname for the title/profile."
         },
-        "photo": {
+        "ticker": {
           "type": "string",
-          "description": "URL or data URI representing the profile photo taken during registration.",
+          "description": "A short, capitalized ticker symbol for the title."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "URL representing the profile photo taken during registration.",
           "format": "uri"
         },
         "description": {
@@ -27,36 +31,42 @@
           "type": "number",
           "description": "The current market value of the title."
         },
-        "overallChangePercent": {
+        "initialValue": {
           "type": "number",
-          "description": "Overall percentage change in value since registration."
+          "description": "The value of the stock at the time of creation."
+        },
+        "change": {
+          "type": "number",
+          "description": "The absolute change in value since creation."
+        },
+        "percentChange": {
+          "type": "number",
+          "description": "The percentage change in value since creation."
         },
         "history": {
           "type": "array",
           "description": "History of the last 100 value changes with timestamps.",
           "items": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "value": { "type": "number" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            },
+            "required": ["value", "timestamp"]
           }
-        },
-        "changePercentLast10Minutes": {
-          "type": "number",
-          "description": "Percentage change in value over the last 10 minutes."
-        },
-        "valueChangeLastMinute": {
-          "type": "number",
-          "description": "Change in value over the last minute."
         }
       },
       "required": [
         "id",
         "nickname",
-        "photo",
+        "ticker",
+        "photoUrl",
         "description",
         "currentValue",
-        "overallChangePercent",
-        "history",
-        "changePercentLast10Minutes",
-        "valueChangeLastMinute"
+        "initialValue",
+        "change",
+        "percentChange",
+        "history"
       ]
     }
   },

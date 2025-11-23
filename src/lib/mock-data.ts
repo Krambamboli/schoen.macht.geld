@@ -9,22 +9,6 @@ const generateTicker = (name: string): string => {
   return sanitized.padEnd(4, 'X');
 };
 
-const generateHistory = (initialValue: number): { date: string; value: number }[] => {
-  const history: { date: string; value: number }[] = [];
-  let currentValue = initialValue;
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    history.push({
-      date: date.toISOString().split('T')[0],
-      value: parseFloat(currentValue.toFixed(2)),
-    });
-    currentValue += (Math.random() - 0.5) * 2;
-    if (currentValue < 1) currentValue = 1;
-  }
-  return history;
-};
-
 const initialNicknames = [
   'Captain-Chaos',
   'Diamond-Hands',
@@ -45,8 +29,10 @@ export const mockStocks: Stock[] = initialNicknames.map((nickname, index) => {
     photoUrl: image.imageUrl,
     description:
       'KI generierte Beschreibung: Macht Geld wirklich schön? Dieses Profil stellt die These auf die Probe. Investieren Sie jetzt und finden Sie es heraus.',
-    value: initialValue,
-    history: generateHistory(initialValue),
-    sentiment: Math.floor(Math.random() * 100) - 50,
+    currentValue: initialValue,
+    initialValue: initialValue,
+    change: 0,
+    percentChange: 0,
+    history: [{ value: initialValue, timestamp: new Date().toISOString() }],
   };
 });
