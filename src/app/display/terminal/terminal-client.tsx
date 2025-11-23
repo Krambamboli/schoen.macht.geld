@@ -70,7 +70,6 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   // Set up an interval to fetch a new headline periodically.
   useEffect(() => {
     // Run it once immediately at the start.
-    fetchHeadline(); 
     const interval = setInterval(fetchHeadline, 30000); // Generate a new headline every 30s
     return () => clearInterval(interval);
   }, [fetchHeadline]);
@@ -219,20 +218,20 @@ export default function TerminalClient() {
                     <TableCell
                       className={cn(
                         'text-right',
-                        stock.valueChangeLast5Minutes === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
+                        (stock.valueChangeLast5Minutes ?? 0) === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      {stock.valueChangeLast5Minutes >= 0 ? '+' : ''}
+                      {(stock.valueChangeLast5Minutes ?? 0) >= 0 ? '+' : ''}
                       {(stock.valueChangeLast5Minutes ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell
                       className={cn(
                         'text-right',
-                         stock.percentChangeLast5Minutes === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
+                         (stock.percentChangeLast5Minutes ?? 0) === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
-                      {stock.percentChangeLast5Minutes >= 0 ? '+' : ''}
-                      {stock.percentChangeLast5Minutes.toFixed(2)}%
+                      {(stock.percentChangeLast5Minutes ?? 0) >= 0 ? '+' : ''}
+                      {(stock.percentChangeLast5Minutes ?? 0).toFixed(2)}%
                     </TableCell>
                   </TableRow>
                 );
