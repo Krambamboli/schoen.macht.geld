@@ -9,11 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Heart, X } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
-// Define a type that includes the change properties
-type StockWithChange = Stock & { change: number; percentChange: number };
-
 export default function SwipeClient() {
-  const [stocks, setStocks] = useState<StockWithChange[]>([]);
+  const [stocks, setStocks] = useState<Stock[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +28,6 @@ export default function SwipeClient() {
         return;
       }
       
-      // Initialize initial values if they don't exist yet for any stock
       storedStocks.forEach(stock => {
         if (!initialValuesRef.current.has(stock.id)) {
             const initialValue = JSON.parse(localStorage.getItem(`initial_stock_${stock.id}`) || 'null');
@@ -44,18 +40,7 @@ export default function SwipeClient() {
         }
       });
 
-      const stocksWithChanges = storedStocks.map(stock => {
-        const initialValue = initialValuesRef.current.get(stock.id) ?? stock.value;
-        const change = stock.value - initialValue;
-        const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
-        return {
-          ...stock,
-          change,
-          percentChange,
-        };
-      })
-
-      setStocks(stocksWithChanges);
+      setStocks(storedStocks);
       setIsLoading(false);
     };
 
@@ -75,24 +60,36 @@ export default function SwipeClient() {
   const handleSwipe = (direction: 'left' | 'right') => {
     if (stocks.length === 0) return;
     
-    // Animate the card out
     const exitX = direction === 'right' ? 300 : -300;
     animate(x, exitX, {
       duration: 0.3,
       onComplete: () => {
-        // This logic runs *after* the animation completes
-        const stockToUpdate = stocks[currentIndex];
-
-        const newValue = stockToUpdate.value + (direction === 'right' ? 0.1 : -0.1);
-
-        // Update localStorage
         const allStocks: Stock[] = JSON.parse(localStorage.getItem('stocks') || '[]');
+        const stockToUpdate = allStocks[currentIndex % allStocks.length];
+        
+        if (!stockToUpdate) return; // Should not happen
+
+        const initialValue = initialValuesRef.current.get(stockToUpdate.id) ?? stockToUpdate.value;
+        const valueChange = direction === 'right' ? 0.1 : -0.1;
+        const newValue = stockToUpdate.value + valueChange;
+
+        const change = newValue - initialValue;
+        const percentChange = initialValue === 0 ? 0 : (change / initialValue) * 100;
+
         const updatedStocks = allStocks.map((s: Stock) => 
-            s.id === stockToUpdate.id ? { ...s, value: newValue } : s
+            s.id === stockToUpdate.id 
+            ? { 
+                ...s, 
+                value: newValue,
+                change: change,
+                percentChange: percentChange,
+              } 
+            : s
         );
+
         localStorage.setItem('stocks', JSON.stringify(updatedStocks));
 
-        // Infinite loop
+        // Go to the next stock, looping infinitely
         setCurrentIndex((prev) => (prev + 1) % stocks.length);
         x.set(0);
       },
@@ -101,7 +98,7 @@ export default function SwipeClient() {
 
   const currentStock = useMemo(() => {
     if (!stocks || stocks.length === 0) return null;
-    return stocks[currentIndex];
+    return stocks[currentIndex % stocks.length];
   }, [stocks, currentIndex]);
 
   if (isLoading) {
@@ -212,5 +209,3 @@ export default function SwipeClient() {
     </div>
   );
 }
-
-    

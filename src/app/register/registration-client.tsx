@@ -206,6 +206,8 @@ export default function RegistrationClient() {
       value: initialValue,
       history: [],
       sentiment: 0,
+      change: 0,
+      percentChange: 0,
     };
     
     // This is the first ever registration, clear all mock data and session history
@@ -373,5 +375,3 @@ export default function RegistrationClient() {
     </Card>
   );
 }
-
-    
