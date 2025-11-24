@@ -24,20 +24,30 @@ export default function SwipeClient() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(true);
   
-  // Local state to hold the shuffled stocks, providing stability.
-  const [shuffledStocks, setShuffledStocks] = useState<Stock[]>([]);
+  // State to hold a stable, shuffled ORDER of stock IDs.
+  const [shuffledIds, setShuffledIds] = useState<string[]>([]);
 
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks, isLoading: isLoadingStocks } = useCollection<Stock>(titlesCollection);
 
-  // Effect to populate and shuffle the stocks only when the source data changes significantly.
+  // Map stocks by ID for efficient lookup. This map always has the latest data.
+  const stocksById = useMemo(() => {
+    if (!stocks) return new Map();
+    return new Map(stocks.map(stock => [stock.id, stock]));
+  }, [stocks]);
+
+
+  // Effect to populate and shuffle the stock IDs only when stocks are added or removed.
   useEffect(() => {
     if (stocks && stocks.length > 0) {
-      // Shuffle the array once and set it to local state.
-      // This prevents re-shuffling on every render or minor data change.
-      setShuffledStocks([...stocks].sort(() => Math.random() - 0.5));
+      // Only re-shuffle if the set of IDs has actually changed.
+      const currentIds = new Set(shuffledIds);
+      const newIds = new Set(stocks.map(s => s.id));
+      if (currentIds.size !== newIds.size || ![...newIds].every(id => currentIds.has(id))) {
+         setShuffledIds([...stocks].map(s => s.id).sort(() => Math.random() - 0.5));
+      }
     }
-  }, [stocks?.length]); // Depend only on the length to shuffle when stocks are added/deleted.
+  }, [stocks]); // Depends on the full stocks array to detect additions/deletions.
 
 
   // Detect if the device has touch capabilities to enable/disable drag gestures.
@@ -67,10 +77,10 @@ export default function SwipeClient() {
    * @param {'left' | 'right'} direction - The direction of the swipe.
    */
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (!firestore || shuffledStocks.length === 0) return;
+    if (!firestore || shuffledIds.length === 0) return;
 
-    const stockToUpdate = shuffledStocks[currentIndex % shuffledStocks.length];
-    if (!stockToUpdate) return;
+    const stockIdToUpdate = shuffledIds[currentIndex % shuffledIds.length];
+    if (!stockIdToUpdate) return;
     
     const exitX = direction === 'right' ? 300 : -300;
     animate(x, exitX, {
@@ -81,7 +91,7 @@ export default function SwipeClient() {
         x.set(0);
         
         const valueChange = direction === 'right' ? 0.1 : -0.1;
-        const stockRef = doc(firestore, 'titles', stockToUpdate.id);
+        const stockRef = doc(firestore, 'titles', stockIdToUpdate);
 
         try {
           // Use a Firestore transaction to safely read and write the stock data.
@@ -147,15 +157,16 @@ export default function SwipeClient() {
     });
   };
 
-  // Get the current stock from the stable shuffled list.
+  // Get the current stock ID from the stable shuffled list, and then get the live data.
   const currentStock = useMemo(() => {
-    if (shuffledStocks.length === 0) return null;
-    return shuffledStocks[currentIndex % shuffledStocks.length];
-  }, [shuffledStocks, currentIndex]);
+    if (shuffledIds.length === 0 || stocksById.size === 0) return null;
+    const currentId = shuffledIds[currentIndex % shuffledIds.length];
+    return stocksById.get(currentId) || null;
+  }, [shuffledIds, currentIndex, stocksById]);
 
   const isLoading = isLoadingStocks || isUserLoading;
 
-  if (isLoading && shuffledStocks.length === 0) {
+  if (isLoading && shuffledIds.length === 0) {
      return (
       <div className="text-center flex flex-col items-center gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
