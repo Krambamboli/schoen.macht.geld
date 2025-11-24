@@ -10,6 +10,7 @@ import { Heart, X, Loader2 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, runTransaction } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
+import { FirestorePermissionError, errorEmitter } from '@/firebase';
 
 /**
  * The main client component for the Swipe Kiosk.
@@ -116,8 +117,7 @@ export default function SwipeClient() {
               const valueChangeLast5Minutes = newValue - oldestValueInLast5Minutes;
               const percentChangeLast5Minutes = (valueChangeLast5Minutes / newValue) * 100;
 
-              // Update the document in the transaction.
-              transaction.update(stockRef, { 
+              const updatedData = {
                 currentValue: newValue,
                 change: newChange,
                 percentChange: newPercentChange,
@@ -125,11 +125,21 @@ export default function SwipeClient() {
                 valueChangeLast5Minutes: valueChangeLast5Minutes,
                 percentChangeLast5Minutes: percentChangeLast5Minutes,
                 history: newHistory,
-              });
+              };
+
+              // Update the document in the transaction.
+              transaction.update(stockRef, updatedData);
            });
 
         } catch (e) {
           console.error("Transaction failed: ", e);
+          // If the transaction fails, create and emit a contextual error.
+          const permissionError = new FirestorePermissionError({
+            path: stockRef.path,
+            operation: 'update',
+            requestResourceData: { valueChange: valueChange }, // Send minimal context
+          });
+          errorEmitter.emit('permission-error', permissionError);
         }
       },
     });
