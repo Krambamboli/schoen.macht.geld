@@ -25,7 +25,7 @@ function usePrevious<T>(value: T): T | undefined {
   const ref = useRef<T>();
   useEffect(() => {
     ref.current = value;
-  }, [value]);
+  }); // No dependency array: runs after every render.
   return ref.current;
 }
 
@@ -139,33 +139,32 @@ export default function TerminalClient() {
     const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
     const { data: stocks } = useCollection<Stock>(titlesCollection);
     
-    // Memoize sorted stocks to prevent re-sorting on every render unless the source data changes.
     const sortedStocks = useMemo(() => {
       return stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
     }, [stocks]);
 
-    const prevSortedStocks = usePrevious(sortedStocks) || [];
+    const prevSortedStocks = usePrevious(sortedStocks);
 
     const rankChanges = useMemo(() => {
         const changes = new Map<string, 'up' | 'down' | 'same'>();
-        if (prevSortedStocks.length === 0 || sortedStocks.length === 0) {
+        // If there's no previous state (e.g., on initial load), all ranks are 'same'.
+        if (!prevSortedStocks || prevSortedStocks.length === 0 || sortedStocks.length === 0) {
             sortedStocks.forEach(stock => changes.set(stock.id, 'same'));
             return changes;
         }
 
         const prevRanks = new Map(prevSortedStocks.map((stock, index) => [stock.id, index]));
-        const newRanks = new Map(sortedStocks.map((stock, index) => [stock.id, index]));
-
-        newRanks.forEach((newRank, stockId) => {
-            const prevRank = prevRanks.get(stockId);
+        
+        sortedStocks.forEach((stock, newRank) => {
+            const prevRank = prevRanks.get(stock.id);
             if (prevRank === undefined) {
-                changes.set(stockId, 'same'); // New entry
+                changes.set(stock.id, 'same'); // New entry, treat as 'same'
             } else if (newRank < prevRank) {
-                changes.set(stockId, 'up');
+                changes.set(stock.id, 'up'); // Moved up in the list
             } else if (newRank > prevRank) {
-                changes.set(stockId, 'down');
+                changes.set(stock.id, 'down'); // Moved down in the list
             } else {
-                changes.set(stockId, 'same');
+                changes.set(stock.id, 'same'); // Position is unchanged
             }
         });
         
@@ -178,16 +177,16 @@ export default function TerminalClient() {
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
         <h1 className="text-2xl">SMG TERMINAL</h1>
       </div>
-      <div className="flex-1 overflow-hidden mt-1">
+      <div className="flex-1 overflow-y-auto mt-1">
         <Table>
           <TableHeader>
             <TableRow className="border-gray-700 hover:bg-gray-900">
-              <TableHead className="text-yellow-400 w-12 px-2 h-7"></TableHead>
-              <TableHead className="text-yellow-400 px-2 h-7">TICKER</TableHead>
-              <TableHead className="text-yellow-400 px-2 h-7">NICKNAME</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-7">WERT</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-7">CHG (5M)</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-7">% CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 w-12 px-2 h-7 py-0"></TableHead>
+              <TableHead className="text-yellow-400 px-2 h-7 py-0">TICKER</TableHead>
+              <TableHead className="text-yellow-400 px-2 h-7 py-0">NICKNAME</TableHead>
+              <TableHead className="text-yellow-400 text-right px-2 h-7 py-0">WERT</TableHead>
+              <TableHead className="text-yellow-400 text-right px-2 h-7 py-0">CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 text-right px-2 h-7 py-0">% CHG (5M)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
