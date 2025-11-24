@@ -26,12 +26,13 @@ export default function SwipeClient() {
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks, isLoading: isLoadingStocks } = useCollection<Stock>(titlesCollection);
 
-  // Memoize a shuffled list of stocks. This list only re-shuffles when the underlying
-  // stocks data from Firestore changes, providing a stable order for swiping.
+  // Memoize a shuffled list of stocks. This list only re-shuffles when the number
+  // of stocks changes (add/delete), providing a much more stable order for swiping.
   const shuffledStocks = useMemo(() => {
     if (!stocks || stocks.length === 0) return [];
     return [...stocks].sort(() => Math.random() - 0.5);
-  }, [stocks]);
+    // The dependency is now the length, not the stocks object itself.
+  }, [stocks?.length]);
 
   // Detect if the device has touch capabilities to enable/disable drag gestures.
   useEffect(() => {
