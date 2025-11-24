@@ -26,6 +26,13 @@ export default function SwipeClient() {
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks, isLoading: isLoadingStocks } = useCollection<Stock>(titlesCollection);
 
+  // Memoize a shuffled list of stocks. This list only re-shuffles when the underlying
+  // stocks data from Firestore changes, providing a stable order for swiping.
+  const shuffledStocks = useMemo(() => {
+    if (!stocks || stocks.length === 0) return [];
+    return [...stocks].sort(() => Math.random() - 0.5);
+  }, [stocks]);
+
   // Detect if the device has touch capabilities to enable/disable drag gestures.
   useEffect(() => {
     setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -53,15 +60,22 @@ export default function SwipeClient() {
    * @param {'left' | 'right'} direction - The direction of the swipe.
    */
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (!firestore || !stocks || stocks.length === 0) return;
+    if (!firestore || !shuffledStocks || shuffledStocks.length === 0) return;
 
-    const stockToUpdate = stocks[currentIndex % stocks.length];
+    const stockToUpdate = shuffledStocks[currentIndex % shuffledStocks.length];
     if (!stockToUpdate) return;
     
+    // Immediately move to the next card visually.
+    const nextIndex = currentIndex + 1;
+
     const exitX = direction === 'right' ? 300 : -300;
     animate(x, exitX, {
       duration: 0.3,
       onComplete: async () => {
+        // Now that the animation is done, update the state and reset the card position.
+        setCurrentIndex(nextIndex);
+        x.set(0);
+        
         const valueChange = direction === 'right' ? 0.1 : -0.1;
         const stockRef = doc(firestore, 'titles', stockToUpdate.id);
 
@@ -116,21 +130,15 @@ export default function SwipeClient() {
         } catch (e) {
           console.error("Transaction failed: ", e);
         }
-
-        // Move to the next card and reset the animation.
-        setCurrentIndex((prev) => (prev + 1));
-        x.set(0);
       },
     });
   };
 
-  // Memoize the current stock to be displayed, shuffling the order for variety.
+  // Get the current stock from the stable shuffled list.
   const currentStock = useMemo(() => {
-    if (!stocks || stocks.length === 0) return null;
-    // Shuffle the stocks array to make the order less predictable on each page load.
-    const shuffled = [...stocks].sort(() => Math.random() - 0.5);
-    return shuffled[currentIndex % shuffled.length];
-  }, [stocks, currentIndex]);
+    if (!shuffledStocks || shuffledStocks.length === 0) return null;
+    return shuffledStocks[currentIndex % shuffledStocks.length];
+  }, [shuffledStocks, currentIndex]);
 
   const isLoading = isLoadingStocks || isUserLoading;
 
