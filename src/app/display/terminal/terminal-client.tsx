@@ -12,22 +12,9 @@ import {
 import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-
-/**
- * A custom hook that returns the value of a variable from the previous render.
- * @param value The value to track.
- * @returns The value from the previous render.
- */
-function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T>();
-  useEffect(() => {
-    ref.current = value;
-  }); // No dependency array: runs after every render.
-  return ref.current;
-}
 
 
 /**
@@ -46,7 +33,7 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
    * Fetches a new batch of headlines from the AI flow. It identifies the top 5
    * "trending" stocks (most volatile) and generates headlines for them.
    */
-  const fetchHeadlinesBatch = useCallback(async () => {
+  const fetchHeadlinesBatch = async () => {
     if (isGenerating || !stocks || stocks.length === 0) return;
     setIsGenerating(true);
 
@@ -80,7 +67,7 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
     } finally {
       setIsGenerating(false);
     }
-  }, [stocks, isGenerating]);
+  };
 
 
   // Set up an interval to fetch a new batch of headlines every 5 minutes.
@@ -88,7 +75,7 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
     const fetchInterval = setInterval(fetchHeadlinesBatch, 300000); // 5 minutes
     fetchHeadlinesBatch(); // Fetch immediately on mount
     return () => clearInterval(fetchInterval);
-  }, [fetchHeadlinesBatch]);
+  }, [stocks]); // Dependency on stocks to re-evaluate if it changes drastically.
 
   // Set up an interval to cycle through the available headlines.
   useEffect(() => {
@@ -143,32 +130,35 @@ export default function TerminalClient() {
       return stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
     }, [stocks]);
 
-    const prevSortedStocks = usePrevious(sortedStocks);
-    
-    const rankChanges = useMemo(() => {
-        const changes = new Map<string, 'up' | 'down' | 'same'>();
-        if (!prevSortedStocks || prevSortedStocks.length === 0 || sortedStocks.length === 0) {
-            sortedStocks.forEach(stock => changes.set(stock.id, 'same'));
-            return changes;
+    const [previousRanks, setPreviousRanks] = useState<Map<string, number>>(new Map());
+    const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
+
+    useEffect(() => {
+        if (sortedStocks.length === 0) {
+            return;
         }
 
-        const prevRanks = new Map(prevSortedStocks.map((stock, index) => [stock.id, index]));
-        
-        sortedStocks.forEach((stock, newRank) => {
-            const prevRank = prevRanks.get(stock.id);
-            if (prevRank === undefined) {
-                changes.set(stock.id, 'same'); // New entry
+        const newRanks = new Map(sortedStocks.map((stock, index) => [stock.id, index]));
+        const newRankChanges = new Map<string, 'up' | 'down' | 'same'>();
+
+        newRanks.forEach((newRank, stockId) => {
+            const prevRank = previousRanks.get(stockId);
+            if (prevRank === undefined || previousRanks.size === 0) {
+                // If there's no previous rank (new stock or first load), it's 'same'.
+                newRankChanges.set(stockId, 'same');
             } else if (newRank < prevRank) {
-                changes.set(stock.id, 'up'); // Moved up
+                newRankChanges.set(stockId, 'up');
             } else if (newRank > prevRank) {
-                changes.set(stock.id, 'down'); // Moved down
+                newRankChanges.set(stockId, 'down');
             } else {
-                changes.set(stock.id, 'same'); // Unchanged
+                newRankChanges.set(stockId, 'same');
             }
         });
         
-        return changes;
-    }, [sortedStocks, prevSortedStocks]);
+        setRankChanges(newRankChanges);
+        setPreviousRanks(newRanks);
+
+    }, [sortedStocks]);
 
 
   return (
@@ -252,5 +242,3 @@ export default function TerminalClient() {
     </div>
   );
 }
-
-    
