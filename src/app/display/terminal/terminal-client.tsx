@@ -148,12 +148,14 @@ export default function TerminalClient() {
         if (prevRanks.size > 0) {
             newRanks.forEach((currentRank, stockId) => {
                 const prevRank = prevRanks.get(stockId);
-                if (prevRank === undefined || prevRank === currentRank) {
-                    changes.set(stockId, 'same');
+                if (prevRank === undefined) {
+                    changes.set(stockId, 'same'); // New stock
                 } else if (currentRank < prevRank) {
                     changes.set(stockId, 'up');
-                } else {
+                } else if (currentRank > prevRank) {
                     changes.set(stockId, 'down');
+                } else {
+                    changes.set(stockId, 'same');
                 }
             });
         } else {
@@ -188,7 +190,7 @@ export default function TerminalClient() {
           </TableHeader>
           <TableBody>
             {sortedStocks
-              .map((stock, index) => {
+              .map((stock) => {
                 const changeLast5MinPositive = (stock.valueChangeLast5Minutes ?? 0) >= 0;
                 const rankChange = rankChanges.get(stock.id);
 
@@ -211,7 +213,7 @@ export default function TerminalClient() {
                   >
                     <TableCell className="w-12 px-2 py-1">{RankIndicator}</TableCell>
                     <TableCell className="font-bold px-2 py-1">{stock.ticker}</TableCell>
-                    <TableCell className="px-2 py-1 truncate">{stock.nickname}</TableCell>
+                    <TableCell className="px-2 py-1 truncate max-w-xs">{stock.nickname}</TableCell>
                     <TableCell
                       className={cn(
                         'text-right font-bold px-2 py-1',
