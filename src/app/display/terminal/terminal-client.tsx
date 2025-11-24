@@ -148,32 +148,30 @@ export default function TerminalClient() {
     const prevSortedStocks = usePrevious(sortedStocks);
 
     const rankChanges = useMemo(() => {
-        const newRankChanges = new Map<string, 'up' | 'down' | 'same'>();
-        
-        // If there's no previous state (e.g., first render or navigating back), mark all as 'same'.
-        if (!prevSortedStocks || prevSortedStocks.length !== sortedStocks.length) {
-          sortedStocks.forEach(stock => newRankChanges.set(stock.id, 'same'));
-          return newRankChanges;
+      const changes = new Map<string, 'up' | 'down' | 'same'>();
+      if (!prevSortedStocks || prevSortedStocks.length !== sortedStocks.length) {
+        sortedStocks.forEach(stock => changes.set(stock.id, 'same'));
+        return changes;
+      }
+  
+      const newRanks = new Map(sortedStocks.map((s, i) => [s.id, i]));
+      const oldRanks = new Map(prevSortedStocks.map((s, i) => [s.id, i]));
+  
+      sortedStocks.forEach(stock => {
+        const newRank = newRanks.get(stock.id);
+        const oldRank = oldRanks.get(stock.id);
+  
+        if (oldRank === undefined || newRank === oldRank) {
+          changes.set(stock.id, 'same');
+        } else if (newRank! < oldRank) {
+          changes.set(stock.id, 'up');
+        } else {
+          changes.set(stock.id, 'down');
         }
-    
-        const newRanks = new Map(sortedStocks.map((stock, index) => [stock.id, index]));
-        const oldRanks = new Map(prevSortedStocks.map((stock, index) => [stock.id, index]));
-    
-        newRanks.forEach((newRank, stockId) => {
-          const oldRank = oldRanks.get(stockId);
-          if (oldRank === undefined) {
-            newRankChanges.set(stockId, 'same'); // New item added to the market.
-          } else if (newRank < oldRank) {
-            newRankChanges.set(stockId, 'up');
-          } else if (newRank > oldRank) {
-            newRankChanges.set(stockId, 'down');
-          } else {
-            newRankChanges.set(stockId, 'same');
-          }
-        });
-    
-        return newRankChanges;
-      }, [sortedStocks, prevSortedStocks]);
+      });
+  
+      return changes;
+    }, [sortedStocks, prevSortedStocks]);
 
 
   return (
