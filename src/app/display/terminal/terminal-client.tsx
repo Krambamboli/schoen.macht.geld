@@ -144,10 +144,9 @@ export default function TerminalClient() {
     }, [stocks]);
 
     const prevSortedStocks = usePrevious(sortedStocks);
-
+    
     const rankChanges = useMemo(() => {
         const changes = new Map<string, 'up' | 'down' | 'same'>();
-        // If there's no previous state (e.g., on initial load), all ranks are 'same'.
         if (!prevSortedStocks || prevSortedStocks.length === 0 || sortedStocks.length === 0) {
             sortedStocks.forEach(stock => changes.set(stock.id, 'same'));
             return changes;
@@ -158,13 +157,13 @@ export default function TerminalClient() {
         sortedStocks.forEach((stock, newRank) => {
             const prevRank = prevRanks.get(stock.id);
             if (prevRank === undefined) {
-                changes.set(stock.id, 'same'); // New entry, treat as 'same'
+                changes.set(stock.id, 'same'); // New entry
             } else if (newRank < prevRank) {
-                changes.set(stock.id, 'up'); // Moved up in the list
+                changes.set(stock.id, 'up'); // Moved up
             } else if (newRank > prevRank) {
-                changes.set(stock.id, 'down'); // Moved down in the list
+                changes.set(stock.id, 'down'); // Moved down
             } else {
-                changes.set(stock.id, 'same'); // Position is unchanged
+                changes.set(stock.id, 'same'); // Unchanged
             }
         });
         
@@ -181,12 +180,12 @@ export default function TerminalClient() {
         <Table>
           <TableHeader>
             <TableRow className="border-gray-700 hover:bg-gray-900">
-              <TableHead className="text-yellow-400 w-12 px-2 h-7 py-0"></TableHead>
-              <TableHead className="text-yellow-400 px-2 h-7 py-0">TICKER</TableHead>
-              <TableHead className="text-yellow-400 px-2 h-7 py-0">NICKNAME</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-7 py-0">WERT</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-7 py-0">CHG (5M)</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-7 py-0">% CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 w-12 px-1 h-6 py-0"></TableHead>
+              <TableHead className="text-yellow-400 px-1 h-6 py-0">TICKER</TableHead>
+              <TableHead className="text-yellow-400 px-1 h-6 py-0">NICKNAME</TableHead>
+              <TableHead className="text-yellow-400 text-right px-1 h-6 py-0">WERT</TableHead>
+              <TableHead className="text-yellow-400 text-right px-1 h-6 py-0">CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 text-right px-1 h-6 py-0">% CHG (5M)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -212,12 +211,12 @@ export default function TerminalClient() {
                     key={stock.id}
                     className="border-gray-800 hover:bg-gray-900/50"
                   >
-                    <TableCell className="w-12 px-2 py-0.5">{RankIndicator}</TableCell>
-                    <TableCell className="font-bold px-2 py-0.5">{stock.ticker}</TableCell>
-                    <TableCell className="px-2 py-0.5 truncate max-w-xs">{stock.nickname}</TableCell>
+                    <TableCell className="w-12 px-1 py-0">{RankIndicator}</TableCell>
+                    <TableCell className="font-bold px-1 py-0">{stock.ticker}</TableCell>
+                    <TableCell className="px-1 py-0 truncate max-w-xs">{stock.nickname}</TableCell>
                     <TableCell
                       className={cn(
-                        'text-right font-bold px-2 py-0.5',
+                        'text-right font-bold px-1 py-0',
                         stock.change >= 0 ? 'text-green-400' : 'text-red-500'
                       )}
                     >
@@ -225,7 +224,7 @@ export default function TerminalClient() {
                     </TableCell>
                     <TableCell
                       className={cn(
-                        'text-right px-2 py-0.5',
+                        'text-right px-1 py-0',
                         (stock.valueChangeLast5Minutes ?? 0) === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
@@ -234,7 +233,7 @@ export default function TerminalClient() {
                     </TableCell>
                     <TableCell
                       className={cn(
-                        'text-right px-2 py-0.5',
+                        'text-right px-1 py-0',
                          (stock.percentChangeLast5Minutes ?? 0) === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
@@ -253,3 +252,5 @@ export default function TerminalClient() {
     </div>
   );
 }
+
+    
