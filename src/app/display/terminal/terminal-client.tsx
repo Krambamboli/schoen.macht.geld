@@ -124,8 +124,11 @@ export default function TerminalClient() {
     const { firestore } = useFirebase();
     const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
     const { data: stocks } = useCollection<Stock>(titlesCollection);
-    const prevRanksRef = useRef<Map<string, number>>();
+    
+    // State to hold the calculated rank changes.
     const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
+    // Ref to store the ranks from the previous render.
+    const prevRanksRef = useRef<Map<string, number>>(new Map());
 
     // Memoize sorted stocks to prevent re-sorting on every render unless the source data changes.
     const sortedStocks = useMemo(() => {
@@ -138,16 +141,18 @@ export default function TerminalClient() {
 
         const newRanks = new Map<string, number>();
         sortedStocks.forEach((stock, index) => {
-            newRanks.set(stock.id, index);
+            newRanks.set(stock.id, index + 1); // Use 1-based ranking
         });
 
         const prevRanks = prevRanksRef.current;
-        if (prevRanks) {
-            const changes = new Map<string, 'up' | 'down' | 'same'>();
+        const changes = new Map<string, 'up' | 'down' | 'same'>();
+        
+        // Only proceed if prevRanks has been initialized.
+        if (prevRanks.size > 0) {
             newRanks.forEach((newRank, stockId) => {
                 const prevRank = prevRanks.get(stockId);
                 if (prevRank === undefined) {
-                    changes.set(stockId, 'same'); // New stock
+                    changes.set(stockId, 'same'); // New stock, treat as 'same' for now
                 } else if (newRank < prevRank) {
                     changes.set(stockId, 'up');
                 } else if (newRank > prevRank) {
@@ -156,11 +161,16 @@ export default function TerminalClient() {
                     changes.set(stockId, 'same');
                 }
             });
-            setRankChanges(changes);
+        } else {
+             // On first run, all are 'same'.
+             newRanks.forEach(stockId => changes.set(stockId, 'same'));
         }
 
-        // Store the new ranks in the ref for the next render cycle.
+        setRankChanges(changes);
+
+        // CRITICAL: Update the ref AFTER the comparison for the next render.
         prevRanksRef.current = newRanks;
+
     }, [sortedStocks]);
 
 
@@ -169,23 +179,23 @@ export default function TerminalClient() {
       <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
         <h1 className="text-2xl">SMG TERMINAL</h1>
       </div>
-      <div className="flex-1 overflow-hidden mt-2">
+      <div className="flex-1 overflow-hidden mt-1">
         <Table>
           <TableHeader>
             <TableRow className="border-gray-700 hover:bg-gray-900">
-              <TableHead className="text-yellow-400 w-12 px-2 h-8"></TableHead>
-              <TableHead className="text-yellow-400 px-2 h-8">TICKER</TableHead>
-              <TableHead className="text-yellow-400 px-2 h-8">NICKNAME</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-8">WERT</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-8">CHG (5M)</TableHead>
-              <TableHead className="text-yellow-400 text-right px-2 h-8">% CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 w-12 px-2 h-7"></TableHead>
+              <TableHead className="text-yellow-400 px-2 h-7">TICKER</TableHead>
+              <TableHead className="text-yellow-400 px-2 h-7">NICKNAME</TableHead>
+              <TableHead className="text-yellow-400 text-right px-2 h-7">WERT</TableHead>
+              <TableHead className="text-yellow-400 text-right px-2 h-7">CHG (5M)</TableHead>
+              <TableHead className="text-yellow-400 text-right px-2 h-7">% CHG (5M)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedStocks
               .map((stock) => {
                 const changeLast5MinPositive = (stock.valueChangeLast5Minutes ?? 0) >= 0;
-                const rankChange = rankChanges.get(stock.id);
+                const rankChange = rankChanges.get(stock.id) || 'same';
 
                 let RankIndicator;
                 switch(rankChange) {
@@ -204,12 +214,12 @@ export default function TerminalClient() {
                     key={stock.id}
                     className="border-gray-800 hover:bg-gray-900/50"
                   >
-                    <TableCell className="w-12 px-2 py-1">{RankIndicator}</TableCell>
-                    <TableCell className="font-bold px-2 py-1">{stock.ticker}</TableCell>
-                    <TableCell className="px-2 py-1 truncate max-w-xs">{stock.nickname}</TableCell>
+                    <TableCell className="w-12 px-2 py-0.5">{RankIndicator}</TableCell>
+                    <TableCell className="font-bold px-2 py-0.5">{stock.ticker}</TableCell>
+                    <TableCell className="px-2 py-0.5 truncate max-w-xs">{stock.nickname}</TableCell>
                     <TableCell
                       className={cn(
-                        'text-right font-bold px-2 py-1',
+                        'text-right font-bold px-2 py-0.5',
                         stock.change >= 0 ? 'text-green-400' : 'text-red-500'
                       )}
                     >
@@ -217,7 +227,7 @@ export default function TerminalClient() {
                     </TableCell>
                     <TableCell
                       className={cn(
-                        'text-right px-2 py-1',
+                        'text-right px-2 py-0.5',
                         (stock.valueChangeLast5Minutes ?? 0) === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
@@ -226,7 +236,7 @@ export default function TerminalClient() {
                     </TableCell>
                     <TableCell
                       className={cn(
-                        'text-right px-2 py-1',
+                        'text-right px-2 py-0.5',
                          (stock.percentChangeLast5Minutes ?? 0) === 0 ? 'text-gray-500' : changeLast5MinPositive ? 'text-green-400' : 'text-red-500'
                       )}
                     >
