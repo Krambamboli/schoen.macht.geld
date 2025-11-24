@@ -12,7 +12,7 @@ import {
 import type { Stock } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
@@ -71,9 +71,9 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
 
   // Set up an interval to fetch a new batch of headlines every 5 minutes.
   useEffect(() => {
+    const fetchInterval = setInterval(fetchHeadlinesBatch, 300000); // 5 minutes
     fetchHeadlinesBatch(); // Fetch immediately on mount
-    const interval = setInterval(fetchHeadlinesBatch, 300000); // 5 minutes
-    return () => clearInterval(interval);
+    return () => clearInterval(fetchInterval);
   }, [fetchHeadlinesBatch]);
 
   // Set up an interval to cycle through the available headlines.
@@ -125,32 +125,32 @@ export default function TerminalClient() {
     const prevRanksRef = useRef<Map<string, number>>(new Map());
     const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
 
-    // Sort stocks by current value to establish ranking.
-    const sortedStocks = stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
+    // Memoize sorted stocks to prevent re-sorting on every render, which caused an infinite loop.
+    const sortedStocks = useMemo(() => {
+      return stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
+    }, [stocks]);
     
-    // After each render, save the current rankings to the ref for the next comparison.
+    // Effect to calculate and set rank changes when the sorted list of stocks updates.
     useEffect(() => {
-        const newRanks = new Map<string, number>();
-        sortedStocks.forEach((stock, index) => {
-            newRanks.set(stock.id, index);
-        });
+      const newRanks = new Map<string, number>();
+      sortedStocks.forEach((stock, index) => {
+        newRanks.set(stock.id, index);
+      });
 
-        const newChanges = new Map<string, 'up' | 'down' | 'same'>();
-        newRanks.forEach((currentRank, stockId) => {
-            const prevRank = prevRanksRef.current.get(stockId);
-            if (prevRank === undefined) {
-                newChanges.set(stockId, 'same');
-            } else if (currentRank < prevRank) {
-                newChanges.set(stockId, 'up');
-            } else if (currentRank > prevRank) {
-                newChanges.set(stockId, 'down');
-            } else {
-                newChanges.set(stockId, 'same');
-            }
-        });
+      const changes = new Map<string, 'up' | 'down' | 'same'>();
+      newRanks.forEach((currentRank, stockId) => {
+        const prevRank = prevRanksRef.current.get(stockId);
+        if (prevRank === undefined || prevRank === currentRank) {
+          changes.set(stockId, 'same');
+        } else if (currentRank < prevRank) {
+          changes.set(stockId, 'up');
+        } else {
+          changes.set(stockId, 'down');
+        }
+      });
 
-        setRankChanges(newChanges);
-        prevRanksRef.current = newRanks;
+      setRankChanges(changes);
+      prevRanksRef.current = newRanks;
 
     }, [sortedStocks]);
 
@@ -174,7 +174,7 @@ export default function TerminalClient() {
           </TableHeader>
           <TableBody>
             {sortedStocks
-              .map((stock, index) => {
+              .map((stock) => {
                 const changeLast5MinPositive = (stock.valueChangeLast5Minutes ?? 0) >= 0;
                 const rankChange = rankChanges.get(stock.id);
 
