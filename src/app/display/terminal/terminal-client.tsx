@@ -138,14 +138,16 @@ export default function TerminalClient() {
 
         const newRanks = new Map<string, number>();
         sortedStocks.forEach((stock, index) => {
-            newRanks.set(stock.id, index);
+            newRanks.set(stock.id, index + 1); // Use 1-based ranking
         });
 
         const changes = new Map<string, 'up' | 'down' | 'same'>();
+        const prevRanks = prevRanksRef.current;
+
         // Only calculate changes if there was a previous ranking to compare against.
-        if (prevRanksRef.current.size > 0) {
+        if (prevRanks.size > 0) {
             newRanks.forEach((currentRank, stockId) => {
-                const prevRank = prevRanksRef.current.get(stockId);
+                const prevRank = prevRanks.get(stockId);
                 if (prevRank === undefined || prevRank === currentRank) {
                     changes.set(stockId, 'same');
                 } else if (currentRank < prevRank) {
@@ -156,12 +158,16 @@ export default function TerminalClient() {
             });
         } else {
             // On the first run, everything is 'same'.
-            newRanks.forEach(stockId => changes.set(stockId, 'same'));
+            newRanks.forEach((rank, stockId) => changes.set(stockId, 'same'));
         }
 
         setRankChanges(changes);
-        // Update the ref *after* the render cycle.
-        prevRanksRef.current = newRanks;
+
+        // Update the ref for the next render.
+        // The cleanup function is the key to ensuring the previous state is correctly captured.
+        return () => {
+          prevRanksRef.current = newRanks;
+        };
     }, [sortedStocks]);
 
 
@@ -246,3 +252,5 @@ export default function TerminalClient() {
     </div>
   );
 }
+
+    
