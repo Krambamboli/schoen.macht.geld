@@ -27,8 +27,6 @@ const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
   const [headlines, setHeadlines] = useState<string[]>(['Willkommen beim Schön. Macht. Geld. News Network.']);
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
-  const tickerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<Animation | null>(null);
 
   /**
    * Fetches a new batch of headlines from the AI flow. It identifies the top 5
@@ -125,35 +123,36 @@ export default function TerminalClient() {
     const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
     const { data: stocks } = useCollection<Stock>(titlesCollection);
     const prevRanksRef = useRef<Map<string, number>>(new Map());
+    const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
 
     // Sort stocks by current value to establish ranking.
     const sortedStocks = stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
-
-    const currentRanks = new Map<string, number>();
-    sortedStocks.forEach((stock, index) => {
-        currentRanks.set(stock.id, index);
-    });
-
-    /**
-     * Determines the rank change of a stock compared to the previous render.
-     * @param {string} stockId - The ID of the stock.
-     * @param {number} currentRank - The stock's current rank in the sorted list.
-     * @returns {'up' | 'down' | 'same'} The direction of rank change.
-     */
-    const getRankChange = (stockId: string, currentRank: number) => {
-      if (!prevRanksRef.current.has(stockId)) {
-          return 'same';
-      }
-      const prevRank = prevRanksRef.current.get(stockId)!;
-      if (currentRank < prevRank) return 'up';
-      if (currentRank > prevRank) return 'down';
-      return 'same';
-    };
     
     // After each render, save the current rankings to the ref for the next comparison.
     useEffect(() => {
-      prevRanksRef.current = currentRanks;
-    });
+        const newRanks = new Map<string, number>();
+        sortedStocks.forEach((stock, index) => {
+            newRanks.set(stock.id, index);
+        });
+
+        const newChanges = new Map<string, 'up' | 'down' | 'same'>();
+        newRanks.forEach((currentRank, stockId) => {
+            const prevRank = prevRanksRef.current.get(stockId);
+            if (prevRank === undefined) {
+                newChanges.set(stockId, 'same');
+            } else if (currentRank < prevRank) {
+                newChanges.set(stockId, 'up');
+            } else if (currentRank > prevRank) {
+                newChanges.set(stockId, 'down');
+            } else {
+                newChanges.set(stockId, 'same');
+            }
+        });
+
+        setRankChanges(newChanges);
+        prevRanksRef.current = newRanks;
+
+    }, [sortedStocks]);
 
 
   return (
@@ -177,7 +176,7 @@ export default function TerminalClient() {
             {sortedStocks
               .map((stock, index) => {
                 const changeLast5MinPositive = (stock.valueChangeLast5Minutes ?? 0) >= 0;
-                const rankChange = getRankChange(stock.id, index);
+                const rankChange = rankChanges.get(stock.id);
 
                 let RankIndicator;
                 switch(rankChange) {
