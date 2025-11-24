@@ -125,7 +125,7 @@ export default function TerminalClient() {
     const prevRanksRef = useRef<Map<string, number>>(new Map());
     const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
 
-    // Memoize sorted stocks to prevent re-sorting on every render, which caused an infinite loop.
+    // Memoize sorted stocks to prevent re-sorting on every render.
     const sortedStocks = useMemo(() => {
       return stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
     }, [stocks]);
