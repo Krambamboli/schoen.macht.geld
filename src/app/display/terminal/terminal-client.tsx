@@ -17,6 +17,20 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 /**
+ * A custom hook that returns the value of a variable from the previous render.
+ * @param value The value to track.
+ * @returns The value from the previous render.
+ */
+function usePrevious<T>(value: T): T | undefined {
+  const ref = useRef<T>();
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref.current;
+}
+
+
+/**
  * A component that displays a scrolling news ticker with AI-generated headlines.
  * It fetches a batch of 5 headlines every 5 minutes and cycles through them.
  * @param {object} props - The component props.
@@ -125,53 +139,38 @@ export default function TerminalClient() {
     const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
     const { data: stocks } = useCollection<Stock>(titlesCollection);
     
-    // State to hold the calculated rank changes.
-    const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
-    // Ref to store the ranks from the previous render.
-    const prevRanksRef = useRef<Map<string, number>>(new Map());
-
     // Memoize sorted stocks to prevent re-sorting on every render unless the source data changes.
     const sortedStocks = useMemo(() => {
       return stocks ? [...stocks].sort((a, b) => b.currentValue - a.currentValue) : [];
     }, [stocks]);
-    
-    // Effect to calculate and set rank changes when the sorted list of stocks updates.
-    useEffect(() => {
-        if (sortedStocks.length === 0) return;
 
-        const newRanks = new Map<string, number>();
-        sortedStocks.forEach((stock, index) => {
-            newRanks.set(stock.id, index + 1);
-        });
+    const prevSortedStocks = usePrevious(sortedStocks) || [];
 
-        const prevRanks = prevRanksRef.current;
+    const rankChanges = useMemo(() => {
         const changes = new Map<string, 'up' | 'down' | 'same'>();
-        
-        // Only calculate changes if we have a previous state to compare against.
-        if (prevRanks.size > 0) {
-            newRanks.forEach((newRank, stockId) => {
-                const prevRank = prevRanks.get(stockId);
-                if (prevRank === undefined) {
-                    changes.set(stockId, 'same'); // New stock, treat as 'same'
-                } else if (newRank < prevRank) {
-                    changes.set(stockId, 'up');
-                } else if (newRank > prevRank) {
-                    changes.set(stockId, 'down');
-                } else {
-                    changes.set(stockId, 'same');
-                }
-            });
-        } else {
-             // On the very first run, all are 'same'.
-             newRanks.forEach((_rank, stockId) => changes.set(stockId, 'same'));
+        if (prevSortedStocks.length === 0 || sortedStocks.length === 0) {
+            sortedStocks.forEach(stock => changes.set(stock.id, 'same'));
+            return changes;
         }
 
-        setRankChanges(changes);
+        const prevRanks = new Map(prevSortedStocks.map((stock, index) => [stock.id, index]));
+        const newRanks = new Map(sortedStocks.map((stock, index) => [stock.id, index]));
 
-        // CRITICAL: Update the ref for the next render AFTER the comparison logic.
-        prevRanksRef.current = newRanks;
-
-    }, [sortedStocks]);
+        newRanks.forEach((newRank, stockId) => {
+            const prevRank = prevRanks.get(stockId);
+            if (prevRank === undefined) {
+                changes.set(stockId, 'same'); // New entry
+            } else if (newRank < prevRank) {
+                changes.set(stockId, 'up');
+            } else if (newRank > prevRank) {
+                changes.set(stockId, 'down');
+            } else {
+                changes.set(stockId, 'same');
+            }
+        });
+        
+        return changes;
+    }, [sortedStocks, prevSortedStocks]);
 
 
   return (
