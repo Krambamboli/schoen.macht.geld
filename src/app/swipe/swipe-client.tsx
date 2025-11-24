@@ -23,17 +23,22 @@ export default function SwipeClient() {
   const { firestore, auth, user, isUserLoading } = useFirebase();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(true);
+  
+  // Local state to hold the shuffled stocks, providing stability.
+  const [shuffledStocks, setShuffledStocks] = useState<Stock[]>([]);
 
   const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
   const { data: stocks, isLoading: isLoadingStocks } = useCollection<Stock>(titlesCollection);
 
-  // Memoize a shuffled list of stocks. This list only re-shuffles when the number
-  // of stocks changes (add/delete), providing a much more stable order for swiping.
-  const shuffledStocks = useMemo(() => {
-    if (!stocks || stocks.length === 0) return [];
-    return [...stocks].sort(() => Math.random() - 0.5);
-    // The dependency is now the length, not the stocks object itself.
-  }, [stocks?.length]);
+  // Effect to populate and shuffle the stocks only when the source data changes significantly.
+  useEffect(() => {
+    if (stocks && stocks.length > 0) {
+      // Shuffle the array once and set it to local state.
+      // This prevents re-shuffling on every render or minor data change.
+      setShuffledStocks([...stocks].sort(() => Math.random() - 0.5));
+    }
+  }, [stocks?.length]); // Depend only on the length to shuffle when stocks are added/deleted.
+
 
   // Detect if the device has touch capabilities to enable/disable drag gestures.
   useEffect(() => {
@@ -62,20 +67,17 @@ export default function SwipeClient() {
    * @param {'left' | 'right'} direction - The direction of the swipe.
    */
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (!firestore || !shuffledStocks || shuffledStocks.length === 0) return;
+    if (!firestore || shuffledStocks.length === 0) return;
 
     const stockToUpdate = shuffledStocks[currentIndex % shuffledStocks.length];
     if (!stockToUpdate) return;
     
-    // Immediately move to the next card visually.
-    const nextIndex = currentIndex + 1;
-
     const exitX = direction === 'right' ? 300 : -300;
     animate(x, exitX, {
       duration: 0.3,
       onComplete: async () => {
         // Now that the animation is done, update the state and reset the card position.
-        setCurrentIndex(nextIndex);
+        setCurrentIndex(prevIndex => prevIndex + 1);
         x.set(0);
         
         const valueChange = direction === 'right' ? 0.1 : -0.1;
@@ -147,13 +149,13 @@ export default function SwipeClient() {
 
   // Get the current stock from the stable shuffled list.
   const currentStock = useMemo(() => {
-    if (!shuffledStocks || shuffledStocks.length === 0) return null;
+    if (shuffledStocks.length === 0) return null;
     return shuffledStocks[currentIndex % shuffledStocks.length];
   }, [shuffledStocks, currentIndex]);
 
   const isLoading = isLoadingStocks || isUserLoading;
 
-  if (isLoading) {
+  if (isLoading && shuffledStocks.length === 0) {
      return (
       <div className="text-center flex flex-col items-center gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
