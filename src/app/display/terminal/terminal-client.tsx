@@ -124,7 +124,7 @@ export default function TerminalClient() {
     const { firestore } = useFirebase();
     const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
     const { data: stocks } = useCollection<Stock>(titlesCollection);
-    const prevRanksRef = useRef<Map<string, number>>(new Map());
+    const prevRanksRef = useRef<Map<string, number>>();
     const [rankChanges, setRankChanges] = useState<Map<string, 'up' | 'down' | 'same'>>(new Map());
 
     // Memoize sorted stocks to prevent re-sorting on every render unless the source data changes.
@@ -138,36 +138,29 @@ export default function TerminalClient() {
 
         const newRanks = new Map<string, number>();
         sortedStocks.forEach((stock, index) => {
-            newRanks.set(stock.id, index + 1); // Use 1-based ranking
+            newRanks.set(stock.id, index);
         });
 
-        const changes = new Map<string, 'up' | 'down' | 'same'>();
         const prevRanks = prevRanksRef.current;
-
-        // Only calculate changes if there was a previous ranking to compare against.
-        if (prevRanks.size > 0) {
-            newRanks.forEach((currentRank, stockId) => {
+        if (prevRanks) {
+            const changes = new Map<string, 'up' | 'down' | 'same'>();
+            newRanks.forEach((newRank, stockId) => {
                 const prevRank = prevRanks.get(stockId);
                 if (prevRank === undefined) {
                     changes.set(stockId, 'same'); // New stock
-                } else if (currentRank < prevRank) {
+                } else if (newRank < prevRank) {
                     changes.set(stockId, 'up');
-                } else if (currentRank > prevRank) {
+                } else if (newRank > prevRank) {
                     changes.set(stockId, 'down');
                 } else {
                     changes.set(stockId, 'same');
                 }
             });
-        } else {
-            // On the first run, everything is 'same'.
-            newRanks.forEach((_rank, stockId) => changes.set(stockId, 'same'));
+            setRankChanges(changes);
         }
 
-        setRankChanges(changes);
-        
-        // CRITICAL: Update the ref for the *next* render *after* calculating changes.
+        // Store the new ranks in the ref for the next render cycle.
         prevRanksRef.current = newRanks;
-
     }, [sortedStocks]);
 
 
