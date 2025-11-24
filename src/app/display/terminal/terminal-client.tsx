@@ -1,6 +1,6 @@
 'use client';
 
-import { generateFunnyNewsHeadline } from '@/ai/flows/generate-funny-news-headlines';
+import { generateFunnyNewsHeadlinesBatch } from '@/ai/flows/generate-funny-news-headlines';
 import {
   Table,
   TableBody,
@@ -18,100 +18,92 @@ import { collection } from 'firebase/firestore';
 
 /**
  * A component that displays a scrolling news ticker with AI-generated headlines.
- * Headlines are generated periodically based on the most volatile stock.
+ * It fetches a batch of 5 headlines every 5 minutes and cycles through them.
  * @param {object} props - The component props.
  * @param {Stock[]} props.stocks - The array of current stocks.
  * @returns {JSX.Element} The rendered news ticker component.
  */
 const NewsTicker = ({ stocks }: { stocks: Stock[] }) => {
-  const [currentHeadline, setCurrentHeadline] = useState(
-    'Willkommen beim Schön. Macht. Geld. News Network.'
-  );
-  const [nextHeadline, setNextHeadline] = useState('');
+  const [headlines, setHeadlines] = useState<string[]>(['Willkommen beim Schön. Macht. Geld. News Network.']);
+  const [headlineIndex, setHeadlineIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const tickerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<Animation | null>(null);
 
   /**
-   * Fetches a new headline from the AI flow. It identifies the "trending" stock
-   * (most volatile) and generates a headline for it.
+   * Fetches a new batch of headlines from the AI flow. It identifies the top 5
+   * "trending" stocks (most volatile) and generates headlines for them.
    */
-  const fetchHeadline = useCallback(async () => {
+  const fetchHeadlinesBatch = useCallback(async () => {
     if (isGenerating || !stocks || stocks.length === 0) return;
     setIsGenerating(true);
-    try {
-      // Find the stock with the largest absolute percentage change.
-      const trendingStock = [...stocks].sort(
-        (a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)
-      )[0];
 
-      if (trendingStock && trendingStock.change !== 0) {
-        const result = await generateFunnyNewsHeadline({
-          stockTicker: trendingStock.ticker,
-          companyName: trendingStock.nickname,
-          description: trendingStock.description,
-          currentValue: trendingStock.currentValue,
-          change: trendingStock.change,
-          percentChange: trendingStock.percentChange,
+    try {
+      // Find the top 5 stocks with the largest absolute percentage change.
+      const trendingStocks = [...stocks]
+        .sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange))
+        .slice(0, 5);
+
+      if (trendingStocks.length > 0) {
+        const result = await generateFunnyNewsHeadlinesBatch({
+          stocks: trendingStocks.map(stock => ({
+            stockTicker: stock.ticker,
+            companyName: stock.nickname,
+            description: stock.description,
+            currentValue: stock.currentValue,
+            change: stock.change,
+            percentChange: stock.percentChange,
+          }))
         });
-        setNextHeadline(
-          `${trendingStock.ticker.toUpperCase()}: ${result.headline}`
-        );
-      } else {
-        setNextHeadline('Der Markt ist ruhig... zu ruhig. Worauf wartest du?');
+        
+        if (result.headlines && result.headlines.length > 0) {
+            setHeadlines(result.headlines);
+            setHeadlineIndex(0); // Reset to the first new headline
+        }
+
       }
     } catch (error) {
-      console.error('Failed to generate news headline:', error);
-      setNextHeadline('NEWS: Der Markt hat technische Schwierigkeiten... oder sind es nur Gefühle?');
+      console.error('Failed to generate news headlines batch:', error);
+      setHeadlines(['NEWS: Der Markt hat technische Schwierigkeiten... oder sind es nur Gefühle?']);
     } finally {
       setIsGenerating(false);
     }
   }, [stocks, isGenerating]);
 
-  // Set up an interval to fetch a new headline periodically.
+
+  // Set up an interval to fetch a new batch of headlines every 5 minutes.
   useEffect(() => {
-    // Run it once immediately at the start.
-    const interval = setInterval(fetchHeadline, 30000); // Generate a new headline every 30s
+    fetchHeadlinesBatch(); // Fetch immediately on mount
+    const interval = setInterval(fetchHeadlinesBatch, 300000); // 5 minutes
     return () => clearInterval(interval);
-  }, [fetchHeadline]);
+  }, [fetchHeadlinesBatch]);
 
-  /**
-   * This function is called when the CSS animation completes an iteration.
-   * It seamlessly swaps the `currentHeadline` with the `nextHeadline` that
-   * has been pre-fetched in the background.
-   */
-  const handleAnimationIteration = useCallback(() => {
-    if (nextHeadline) {
-      setCurrentHeadline(nextHeadline);
-      setNextHeadline(''); // Clear next headline so we can fetch a new one
-      // The fetchHeadline interval will eventually call and set a new nextHeadline
-    }
-  }, [nextHeadline]);
-
-  // Add and remove the event listener for the animation iteration.
+  // Set up an interval to cycle through the available headlines.
   useEffect(() => {
-    const tickerElement = tickerRef.current;
-    if (tickerElement) {
-      tickerElement.addEventListener('animationiteration', handleAnimationIteration);
-      return () => {
-        if (tickerElement) {
-          tickerElement.removeEventListener('animationiteration', handleAnimationIteration);
-        }
-      };
-    }
-  }, [handleAnimationIteration]);
+    const headlineCycleInterval = setInterval(() => {
+        setHeadlineIndex(prevIndex => (prevIndex + 1) % headlines.length);
+    }, 30000); // Change headline every 30 seconds
+
+    return () => clearInterval(headlineCycleInterval);
+  }, [headlines]);
+
+  // Use a key on the animated div to force a re-render (and restart the animation) when the headline changes.
+  const currentHeadline = headlines[headlineIndex];
 
   return (
     <div className="w-full bg-red-700 text-white h-10 flex items-center overflow-hidden">
-      <div
-        ref={tickerRef}
-        className="flex animate-marquee-fast whitespace-nowrap"
-      >
-        <span className="text-xl font-bold px-12">{currentHeadline}</span>
-        <span className="text-xl font-bold px-12" aria-hidden="true">{currentHeadline}</span>
-      </div>
+       {currentHeadline && (
+         <div
+            key={currentHeadline} // This is the key!
+            className="flex animate-marquee-fast whitespace-nowrap"
+          >
+            <span className="text-xl font-bold px-12">{currentHeadline}</span>
+            <span className="text-xl font-bold px-12" aria-hidden="true">{currentHeadline}</span>
+        </div>
+       )}
       <style jsx>{`
         @keyframes marquee-fast {
-          from { transform: translateX(0); }
+          from { transform: translateX(0%); }
           to { transform: translateX(-50%); }
         }
         .animate-marquee-fast {
