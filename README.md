@@ -1,90 +1,71 @@
 # Schön. Macht. Geld. - The Ultimate Stock Market Party Game
 
-This is a Next.js application that powers an interactive party game where guests become publicly traded "stocks." Their value is influenced in real-time by other guests through a Tinder-style swiping interface. The project uses Firebase for its backend, including Firestore for the database and anonymous authentication to identify users at the swipe and registration kiosks.
+Welcome to the repository for "Schön. Macht. Geld.", an interactive party game where guests become publicly traded "stocks." Their market value is influenced in real-time by other guests through a simple, engaging swiping interface. This project is built as a modern web application designed to run on specific hardware setups within a party environment.
 
-The application is built with Next.js, React, TypeScript, Tailwind CSS for styling, and ShadCN for UI components. It features three main interfaces:
-1.  **Registration Kiosk (`/register`):** Where users create their stock profile with a nickname and a live photo.
-2.  **Swipe Kiosk (`/swipe`):** Where users can anonymously "like" (swipe right) or "dislike" (swipe left) profiles, influencing their stock value.
-3.  **Display Screens (`/display`):** A set of live dashboards for projectors, showing market data through a ticker, a market map, a leaderboard, and a terminal-style view.
+## The Concept
 
----
+The game turns party guests into living assets on a speculative market.
 
-## Project Architecture
+1.  **Become a Stock:** A guest registers at a dedicated kiosk, gives themselves a nickname, and takes a live photo. They are now a "stock" on the party's stock exchange, starting with an initial value.
+2.  **Influence the Market:** Other guests use touchscreen "swipe kiosks" to view the profiles of the registered stocks. Swiping right ("Like") increases a stock's value, while swiping left ("Dislike") decreases it.
+3.  **Live Market Data:** Throughout the venue, large display screens show real-time market data, including a live stock ticker, a market overview, a leaderboard of the top-performing stocks, and an AI-generated news feed with satirical headlines about the market's activity.
 
-The application follows a standard Next.js App Router structure. It's organized into components, pages, AI flows, Firebase services, and utility functions.
-
--   **Frontend:** Built with Next.js and React. Client components (`'use client'`) are used for interactive UI, especially for pages that require access to browser APIs (like the camera) or real-time data fetching.
--   **Backend:** Firebase is used as the backend-as-a-service.
-    -   **Firestore:** A NoSQL database used to store all the `title` (stock) data. This includes profile information, current value, and a history of value changes. It acts as the single source of truth.
-    -   **Firebase Authentication:** Anonymous authentication is used to create temporary, anonymous user accounts for the kiosks. This is necessary to satisfy security rules that require a user to be logged in for write operations.
--   **Styling:** Tailwind CSS is used for utility-first styling, customized through `tailwind.config.ts`. ShadCN UI provides the component library, with theme variables defined in `src/app/globals.css`.
--   **Generative AI:** Genkit and the Gemini API are used to generate satirical profile descriptions and news headlines. The AI flows are defined in the `src/ai/flows` directory.
+The theme is a satirical take on finance culture, vanity, and social climbing, all within a hedonistic party setting.
 
 ---
 
-## File Structure Overview
+## Application Interfaces & Hardware Targets
 
+The application is a single Next.js project but is comprised of three distinct interfaces, each designed for a specific type of hardware:
+
+1.  **Registration Kiosk (`/register`)**
+    *   **Purpose:** Where users create their stock profile with a nickname and a live photo. It also serves as an admin panel for managing stocks.
+    *   **Target Hardware:** A tablet with a front-facing camera.
+
+2.  **Swipe Kiosk (`/swipe`)**
+    *   **Purpose:** Where guests can anonymously "like" (swipe right) or "dislike" (swipe left) profiles, directly influencing their stock value.
+    *   **Target Hardware:** A touchscreen device (e.g., a phone or small tablet).
+
+3.  **Display Screens (`/display/*`)**
+    *   **Purpose:** A set of live dashboards for projectors or large screens, showing market data. This is a view-only interface with no input capabilities.
+    *   **Target Hardware:** Low-power devices like a **Raspberry Pi Zero 2 W** connected to screens. The client-side logic for these views must be lightweight to ensure smooth performance.
+
+---
+
+## Technical Stack
+
+*   **Framework:** Next.js with App Router
+*   **Language:** TypeScript
+*   **Styling:** Tailwind CSS with ShadCN UI components
+*   **Database:** Firebase Firestore (used as the real-time backend)
+*   **Authentication:** Firebase Anonymous Authentication (for write permissions from kiosks)
+*   **Generative AI:** Google AI (Gemini) via Genkit for profile descriptions and news headlines
+
+---
+
+## Architecture & Contribution Guide
+
+This project was rapidly prototyped and, while functional, has key areas for improvement. Contributors should be aware of the current architecture and its limitations.
+
+### Current State: Direct Client-to-Database Communication
+
+The application currently operates without a dedicated backend API layer. All three client interfaces (Registration, Swipe, Display) communicate **directly with the Firebase Firestore database** using the Firebase client-side SDK.
+
+*   **Pros:** This architecture allows for rapid development and leverages Firestore's excellent real-time capabilities, which is perfect for the live display screens.
+*   **Cons & The "Missing Piece":** As you correctly pointed out, this is not a scalable or secure long-term solution. A robust application would have a dedicated API service that sits between the clients and the database. The clients would make requests to the API (e.g., `POST /api/swipe`), and the API would handle all the business logic and database interaction.
+
+### Opportunities for Contribution (Future Work)
+
+The most significant area for improvement is to refactor the application to use a proper backend API, addressing the "single source of truth" concern more robustly.
+
+1.  **Implement a Backend API:**
+    *   The highest-impact change would be to create a dedicated backend service (e.g., using Node.js/Express, or Cloud Functions for Firebase).
+    *   This API would expose endpoints like `POST /register`, `POST /swipe`, and `GET /stocks`.
+    *   All database logic currently found in the client components (especially the transaction in `src/app/swipe/swipe-client.tsx`) should be moved into this API layer.
+
+2.  **Refactor Clients to Use the API:**
+    *   Once the API is in place, the frontend components should be updated to make `fetch` requests to the new API endpoints instead of communicating directly with Firestore.
+    *   The Display clients would likely switch from direct Firestore listeners to a WebSocket connection or server-sent events (SSE) from the new backend to maintain real-time updates.
+
+By making these changes, we can achieve better security (clients no longer need direct database write access), improved scalability, and a clearer separation of concerns between the frontend and backend.
 ```
-.
-├── src
-│   ├── ai
-│   │   ├── flows/            # Genkit AI flows for generating content
-│   │   └── genkit.ts         # Genkit and Google AI plugin configuration
-│   ├── app
-│   │   ├── (main)/           # Main application pages
-│   │   ├── display/          # Layout and pages for the public display screens
-│   │   ├── register/         # The registration kiosk page
-│   │   ├── swipe/            # The swipe kiosk page
-│   │   ├── globals.css       # Global styles and Tailwind CSS layers
-│   │   └── layout.tsx        # Root layout for the application
-│   ├── components
-│   │   ├── ui/               # ShadCN UI components
-│   │   ├── FirebaseErrorListener.tsx # Global listener for Firebase security errors
-│   │   └── icons.tsx         # Custom SVG icons
-│   ├── firebase
-│   │   ├── firestore/        # Custom hooks for Firestore (useCollection, useDoc)
-│   │   ├── client-provider.tsx # Client-side Firebase initializer
-│   │   ├── config.ts         # Firebase project configuration
-│   │   ├── error-emitter.ts  # Global event emitter for errors
-│   │   ├── errors.ts         # Custom Firebase error classes
-│   │   ├── index.ts          # Barrel file for exporting all Firebase utilities
-│   │   ├── non-blocking-login.tsx  # Functions for non-blocking auth operations
-│   │   ├── non-blocking-updates.tsx # Functions for non-blocking Firestore writes
-│   │   └── provider.tsx      # React Context provider for Firebase services
-│   ├── hooks/                # Custom React hooks (use-toast, use-mobile)
-│   └── lib/                  # Library files, utilities, and type definitions
-│       ├── types.ts          # TypeScript type definitions (e.g., Stock)
-│       └── utils.ts          # Utility functions (e.g., cn for classnames)
-├── docs
-│   └── backend.json          # Defines the data schema for Firestore entities
-├── public/                   # Static assets
-└── firestore.rules           # Security rules for the Firestore database
-```
-
-### Key Files & Directories
-
--   **`src/app/layout.tsx`**: The root layout of the application. It sets up the global font, theme (`dark`), and wraps the entire app in the `FirebaseClientProvider` to make Firebase services available to all components.
-
--   **`src/firebase/`**: This directory is the heart of the Firebase integration.
-    -   **`index.ts` & `client-provider.tsx`**: These files work together to initialize Firebase on the client-side and provide the `firestore` and `auth` instances to the rest of the app via React Context.
-    -   **`firestore/use-collection.tsx`**: A crucial custom hook that subscribes to a Firestore collection in real-time. It's used by all display screens to get live market data.
-    -   **`non-blocking-updates.tsx`**: Contains helper functions (`setDocumentNonBlocking`, `updateDocumentNonBlocking`) that perform Firestore write operations without `await`ing them. This improves UI responsiveness, especially on the swipe kiosk.
-    -   **`errors.ts` & `error-emitter.ts`**: A system for creating and handling custom, detailed Firebase permission errors, which is invaluable for debugging security rules.
-
--   **`src/app/register/registration-client.tsx`**: A client component that handles the entire user registration flow. It uses `navigator.mediaDevices` to access the camera, captures a photo, calls an AI flow to generate a profile description, and finally saves the new stock to Firestore using `setDocumentNonBlocking`.
-
--   **`src/app/swipe/swipe-client.tsx`**: The swipe interface. It fetches a stock from Firestore, and on swipe, it uses a `runTransaction` operation to safely update the stock's value and history. This is the primary mechanism for changing market data.
-
--   **`src/app/display/`**: This directory contains the four main display views. All of them are client components that use the `useCollection` hook to listen for live updates from the `titles` collection in Firestore.
-    -   `page.tsx` (Ticker): A scrolling marquee of stock prices.
-    -   `market-map/`: A treemap visualization of the market, where size and color represent stock value and performance.
-    -   `leaderboard/`: A ranked list of all stocks by performance.
-    -   `terminal/`: A "Bloomberg" style terminal showing detailed data and an AI-powered news ticker.
-
--   **`src/ai/flows/`**: Contains the server-side logic for interacting with the Gemini model via Genkit.
-    -   `generate-profile-descriptions.ts`: Defines the prompt and flow for creating witty, first-person stock descriptions.
-    -   `generate-funny-news-headlines.ts`: Defines the prompt and flow for creating satirical news headlines based on a stock's performance.
-
--   **`firestore.rules`**: Defines the security rules for the database. It allows anyone to `read` data but restricts `create` and `update` operations to authenticated users. This is why anonymous sign-in is used on the kiosks.
-
----
