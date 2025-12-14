@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.admin import setup_admin
 from app.config import settings
-from app.database import init_db
+from app.database import engine, init_db
 from app.routers import stocks, swipe
 
 
@@ -35,6 +36,9 @@ app.add_middleware(
 
 app.include_router(stocks.router, prefix="/stocks", tags=["stocks"])
 app.include_router(swipe.router, prefix="/swipe", tags=["swipe"])
+
+# Admin panel at /admin
+_ = setup_admin(app, engine)
 
 
 @app.get("/health")
