@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from loguru import logger
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,6 +15,7 @@ async def list_stocks(session: AsyncSession = Depends(get_session)):
     """Get all stocks."""
     result = await session.exec(select(Stock))
     stocks = result.all()
+    logger.debug("Listed {} stocks", len(stocks))
     return [StockResponse.model_validate(s) for s in stocks]
 
 
@@ -22,5 +24,6 @@ async def get_stock(ticker: str, session: AsyncSession = Depends(get_session)):
     """Get a single stock by ticker."""
     stock = await session.get(Stock, ticker)
     if not stock:
+        logger.warning("Stock not found: {}", ticker)
         raise HTTPException(status_code=404, detail="Stock not found")
     return StockResponse.model_validate(stock)

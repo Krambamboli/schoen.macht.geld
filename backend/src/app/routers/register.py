@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from loguru import logger
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.database import get_session
@@ -25,6 +26,7 @@ async def register_stock(
     # Check if ticker already exists
     existing = await session.get(Stock, ticker)
     if existing:
+        logger.warning("Ticker {} already exists", ticker)
         raise HTTPException(
             status_code=400, detail=f"Ticker {ticker} already exists"
         )
@@ -40,4 +42,5 @@ async def register_stock(
     await session.commit()
     await session.refresh(stock)
 
+    logger.info("Registered stock {} ({})", ticker, request.nickname)
     return StockResponse.model_validate(stock)

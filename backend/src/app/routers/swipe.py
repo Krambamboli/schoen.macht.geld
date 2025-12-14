@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from loguru import logger
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.database import get_session
@@ -17,6 +18,7 @@ async def swipe(request: SwipeRequest, session: AsyncSession = Depends(get_sessi
     """Record a swipe and update stock value."""
     stock = await session.get(Stock, request.ticker)
     if not stock:
+        logger.warning("Swipe on unknown ticker: {}", request.ticker)
         raise HTTPException(status_code=404, detail="Stock not found")
 
     # Calculate value change
@@ -43,4 +45,5 @@ async def swipe(request: SwipeRequest, session: AsyncSession = Depends(get_sessi
     await session.commit()
     await session.refresh(stock)
 
+    logger.debug("{} {} -> {:.2f}", request.ticker, request.direction, stock.current_value)
     return StockResponse.model_validate(stock)

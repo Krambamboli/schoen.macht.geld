@@ -8,6 +8,7 @@ dependencies = [
     "aiosqlite>=0.22.0",
     "alembic>=1.17.2",
     "fastapi>=0.124.4",
+    "loguru>=0.7.3",
     "pydantic-settings>=2.12.0",
     "sqlmodel>=0.0.27",
     "uvicorn[standard]>=0.38.0",
