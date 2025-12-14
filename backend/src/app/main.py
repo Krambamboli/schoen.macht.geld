@@ -6,7 +6,7 @@ from loguru import logger
 
 from app.config import settings
 from app.database import init_db
-from app.routers import register, stocks, swipe
+from app.routers import stocks, swipe
 
 
 @asynccontextmanager
@@ -35,7 +35,6 @@ app.add_middleware(
 
 app.include_router(stocks.router, prefix="/stocks", tags=["stocks"])
 app.include_router(swipe.router, prefix="/swipe", tags=["swipe"])
-app.include_router(register.router, prefix="/register", tags=["register"])
 
 
 @app.get("/health")

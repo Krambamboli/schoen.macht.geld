@@ -1,3 +1,3 @@
-from app.routers import register, stocks, swipe
+from app.routers import stocks, swipe
 
-__all__ = ["register", "stocks", "swipe"]
+__all__ = ["stocks", "swipe"]

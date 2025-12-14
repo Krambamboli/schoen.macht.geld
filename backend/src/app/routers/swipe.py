@@ -13,8 +13,8 @@ router = APIRouter()
 SWIPE_VALUE = 0.1  # Value change per swipe
 
 
-@router.post("/", response_model=StockResponse)
-async def swipe(request: SwipeRequest, session: AsyncSession = Depends(get_session)):
+@router.post("/")
+async def swipe(request: SwipeRequest, session: AsyncSession = Depends(get_session)) -> StockResponse:
     """Record a swipe and update stock value."""
     stock = await session.get(Stock, request.ticker)
     if not stock:
