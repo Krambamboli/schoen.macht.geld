@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
@@ -31,13 +31,13 @@ async def swipe(request: SwipeRequest, session: AsyncSession = Depends(get_sessi
 
     # Update stock value
     stock.current_value += delta
-    stock.updated_at = datetime.utcnow()
+    stock.updated_at = datetime.now(UTC)
 
     # Record price history
     history_entry = PriceHistory(
         ticker=stock.ticker,
         value=stock.current_value,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
     )
     session.add(history_entry)
 

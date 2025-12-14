@@ -10,7 +10,7 @@ from app.routers import stocks, swipe
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # pyright: ignore[reportUnusedParameter]
     """Initialize database on startup."""
     logger.info("Starting up")
     await init_db()

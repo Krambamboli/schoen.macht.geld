@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import UTC, datetime
+from functools import partial
 
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -6,13 +7,13 @@ from sqlmodel import Field, Relationship, SQLModel
 class PriceHistory(SQLModel, table=True):
     """Price history entry for a stock."""
 
-    __tablename__ = "price_history"
+    __tablename__ = "price_history"  # pyright: ignore[reportAssignmentType]
 
     ticker: str = Field(foreign_key="stock.ticker", primary_key=True)
-    timestamp: datetime = Field(default_factory=datetime.utcnow, primary_key=True)
+    timestamp: datetime = Field(default_factory=partial(datetime.now, UTC), primary_key=True)
     value: float
 
-    stock: "Stock" = Relationship(back_populates="history")
+    stock: "Stock" = Relationship(back_populates="history")  # pyright: ignore[reportAny]
 
 
 class Stock(SQLModel, table=True):
@@ -29,10 +30,10 @@ class Stock(SQLModel, table=True):
     rank: int | None = None
     previous_rank: int | None = None
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=partial(datetime.now, UTC))
+    updated_at: datetime = Field(default_factory=partial(datetime.now, UTC))
 
-    history: list[PriceHistory] = Relationship(
+    history: list[PriceHistory] = Relationship(  # pyright: ignore[reportAny]
         back_populates="stock",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
