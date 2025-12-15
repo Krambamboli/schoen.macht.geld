@@ -1,7 +1,9 @@
 import random
 from datetime import UTC, datetime
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler  # pyright: ignore[reportMissingTypeStubs]
+from apscheduler.schedulers.asyncio import (  # pyright: ignore[reportMissingTypeStubs]
+    AsyncIOScheduler,
+)
 from loguru import logger
 from sqlmodel import select
 
