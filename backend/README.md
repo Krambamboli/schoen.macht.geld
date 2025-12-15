@@ -44,15 +44,15 @@ data/
 
 ### Stock
 
-| Field       | Type     | Description                    |
-|-------------|----------|--------------------------------|
-| ticker      | str      | Primary key (4 chars, e.g. "AAPL") |
-| title       | str      | Display name                   |
-| image       | str?     | Image URL or `/images/{file}`  |
-| description | str      | Optional description           |
-| is_active   | bool     | Whether stock is tradeable     |
-| price       | float    | Current price (from latest StockPrice) |
-| prices      | list     | Price history entries          |
+| Field       | Type          | Description                           |
+|-------------|---------------|---------------------------------------|
+| ticker      | str           | Primary key (4 chars, e.g. "AAPL")    |
+| title       | str           | Display name                          |
+| image       | StorageImage? | Uploaded image (served at `/images/`) |
+| description | str           | Optional description                  |
+| is_active   | bool          | Whether stock is tradeable            |
+| price       | float         | Current price (from latest StockPrice)|
+| prices      | list          | Price history entries                 |
 
 ### StockPrice
 
@@ -80,7 +80,6 @@ data/
 | GET    | /stocks/                | List all stocks          |
 | POST   | /stocks/                | Create new stock         |
 | GET    | /stocks/{ticker}        | Get stock by ticker      |
-| PATCH  | /stocks/{ticker}/image  | Update stock image URL   |
 | POST   | /stocks/{ticker}/image  | Upload stock image       |
 | POST   | /stocks/{ticker}/price  | Manipulate stock price   |
 | POST   | /swipe/                 | Record swipe action      |
@@ -133,6 +132,7 @@ Environment variables (or `.env` file):
 | DEBUG               | false                                | Enable debug mode                  |
 | CORS_ORIGINS        | ["http://localhost:3000"]            | Allowed CORS origins               |
 | LOGURU_LEVEL        | INFO                                 | Log level (loguru)                 |
+| STOCK_BASE_PRICE    | 1000.0                               | Default price for new stocks       |
 | PRICE_TICK_INTERVAL | 60                                   | Seconds between random price ticks |
 | PRICE_TICK_ENABLED  | true                                 | Enable background price updates    |
 | IMAGE_DIR           | ./data/images                        | Directory for uploaded images      |
@@ -157,7 +157,7 @@ The following changes need to be made in the frontend:
 | Old Field       | New Field      | Notes                           |
 |-----------------|----------------|---------------------------------|
 | `nickname`      | `title`        | Renamed                         |
-| `photo_url`     | `image`        | Renamed, now nullable           |
+| `photo_url`     | `image`        | Now `StorageImage?` (file upload only) |
 | `current_value` | `price`        | Computed from latest StockPrice |
 | `initial_value` | `initial_price`| Computed from first StockPrice  |
 | `rank`          | -              | Removed                         |
@@ -184,15 +184,12 @@ The following changes need to be made in the frontend:
 
 ### New Endpoints
 
-- `PATCH /stocks/{ticker}/image` - Update stock image URL
-  - Body: `{ "image": "url" | null }`
-
 - `POST /stocks/{ticker}/image` - Upload stock image file
   - Content-Type: `multipart/form-data`
   - Field: `file` (image file)
   - Allowed types: JPEG, PNG, GIF, WebP
   - Max size: 5MB
-  - Returns: Stock with `image` set to `/images/{filename}`
+  - Returns: Stock with `image` path (served at `/images/`)
 
 - `POST /stocks/{ticker}/price` - Manipulate stock price
   - Body: `{ "delta": float, "change_type": "admin" | "random" | ... }`
