@@ -1,24 +1,32 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.database import get_session
-from app.models.stock import Stock
-from app.schemas.stock import StockCreate, StockResponse
+from app.models.stock import ChangeType, Stock, StockPrice
+from app.schemas.stock import (
+    PriceManipulation,
+    StockCreate,
+    StockImageUpdate,
+    StockResponse,
+)
 
 router = APIRouter()
 
 
-def generate_ticker(nickname: str) -> str:
-    """Generate a 4-char ticker from nickname."""
-    # Take first 4 chars, uppercase, pad with X if needed
-    clean = "".join(c for c in nickname if c.isalpha()).upper()
+def generate_ticker(title: str) -> str:
+    """Generate a 4-char ticker from title."""
+    clean = "".join(c for c in title if c.isalpha()).upper()
     return (clean[:4]).ljust(4, "X")
 
 
 @router.get("/")
-async def list_stocks(session: AsyncSession = Depends(get_session)) -> list[StockResponse]:
+async def list_stocks(
+    session: AsyncSession = Depends(get_session),
+) -> list[StockResponse]:
     """Get all stocks."""
     result = await session.exec(select(Stock))
     stocks = result.all()
@@ -30,37 +38,101 @@ async def list_stocks(session: AsyncSession = Depends(get_session)) -> list[Stoc
 async def create_stock(
     request: StockCreate, session: AsyncSession = Depends(get_session)
 ) -> StockResponse:
-    """Create a new stock (person)."""
-    ticker = generate_ticker(request.nickname)
+    """Create a new stock."""
+    ticker = generate_ticker(request.title)
 
-    # Check if ticker already exists
     existing = await session.get(Stock, ticker)
     if existing:
         logger.warning("Ticker {} already exists", ticker)
-        raise HTTPException(
-            status_code=400, detail=f"Ticker {ticker} already exists"
-        )
+        raise HTTPException(status_code=400, detail=f"Ticker {ticker} already exists")
 
     stock = Stock(
         ticker=ticker,
-        nickname=request.nickname,
-        photo_url=request.photo_url,
+        title=request.title,
+        image=request.image,
         description=request.description,
     )
-
     session.add(stock)
+
+    # Create initial price entry
+    initial_price = StockPrice(
+        ticker=ticker,
+        price=max(0.0, request.initial_price),
+        change_type=ChangeType.INITIAL,
+    )
+    session.add(initial_price)
+
     await session.commit()
     await session.refresh(stock)
 
-    logger.info("Created stock {} ({})", ticker, request.nickname)
+    logger.info("Created stock {} ({})", ticker, request.title)
     return StockResponse.model_validate(stock)
 
 
 @router.get("/{ticker}")
-async def get_stock(ticker: str, session: AsyncSession = Depends(get_session)) -> StockResponse:
+async def get_stock(
+    ticker: str, session: AsyncSession = Depends(get_session)
+) -> StockResponse:
     """Get a single stock by ticker."""
     stock = await session.get(Stock, ticker)
     if not stock:
         logger.warning("Stock not found: {}", ticker)
         raise HTTPException(status_code=404, detail="Stock not found")
+    return StockResponse.model_validate(stock)
+
+
+@router.patch("/{ticker}/image")
+async def update_stock_image(
+    ticker: str,
+    request: StockImageUpdate,
+    session: AsyncSession = Depends(get_session),
+) -> StockResponse:
+    """Update stock image."""
+    stock = await session.get(Stock, ticker)
+    if not stock:
+        logger.warning("Stock not found: {}", ticker)
+        raise HTTPException(status_code=404, detail="Stock not found")
+
+    stock.image = request.image
+    stock.updated_at = datetime.now(UTC)
+    session.add(stock)
+    await session.commit()
+    await session.refresh(stock)
+
+    logger.info("Updated image for {}", ticker)
+    return StockResponse.model_validate(stock)
+
+
+@router.post("/{ticker}/price")
+async def manipulate_price(
+    ticker: str,
+    request: PriceManipulation,
+    session: AsyncSession = Depends(get_session),
+) -> StockResponse:
+    """Manipulate stock price."""
+    stock = await session.get(Stock, ticker)
+    if not stock:
+        logger.warning("Stock not found: {}", ticker)
+        raise HTTPException(status_code=404, detail="Stock not found")
+
+    # Calculate new price (enforce >= 0)
+    new_price = max(0.0, stock.price + request.delta)
+
+    # Create price entry
+    price_entry = StockPrice(
+        ticker=ticker,
+        price=new_price,
+        change_type=request.change_type,
+    )
+    session.add(price_entry)
+
+    stock.updated_at = datetime.now(UTC)
+    session.add(stock)
+    await session.commit()
+    await session.refresh(stock)
+
+    logger.debug(
+        "{} price {} by {:.2f} -> {:.2f}",
+        ticker, request.change_type.value, request.delta, new_price,
+    )
     return StockResponse.model_validate(stock)

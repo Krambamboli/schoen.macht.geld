@@ -12,5 +12,9 @@ class Settings(BaseSettings):
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Background price tick settings
+    price_tick_interval: int = 60  # seconds between random price updates
+    price_tick_enabled: bool = True
+
 
 settings = Settings()

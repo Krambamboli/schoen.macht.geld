@@ -8,14 +8,17 @@ from app.admin import setup_admin
 from app.config import settings
 from app.database import engine, init_db
 from app.routers import stocks, swipe
+from app.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # pyright: ignore[reportUnusedParameter]
-    """Initialize database on startup."""
+    """Initialize database and scheduler on startup."""
     logger.info("Starting up")
     await init_db()
+    start_scheduler()
     yield
+    stop_scheduler()
     logger.info("Shutting down")
 
 

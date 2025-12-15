@@ -1,15 +1,19 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
+
+from app.models.stock import ChangeType
 
 
-class PriceHistoryResponse(BaseModel):
-    """Price history entry for API response."""
+class StockPriceResponse(BaseModel):
+    """Stock price entry for API response."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    value: float
-    timestamp: datetime
+    id: int
+    price: float
+    change_type: ChangeType
+    created_at: datetime
 
 
 class StockResponse(BaseModel):
@@ -18,33 +22,62 @@ class StockResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     ticker: str
-    nickname: str
-    photo_url: str
+    title: str
+    image: str | None
     description: str
-    current_value: float
-    initial_value: float
-    rank: int | None = None
-    previous_rank: int | None = None
-    history: list[PriceHistoryResponse] = []
+    is_active: bool
+    price: float
+    prices: list[StockPriceResponse] = []
+    created_at: datetime
+    updated_at: datetime
 
-    # Computed fields for frontend compatibility
-    change: float = 0.0
-    percent_change: float = 0.0
-    value_change_last_minute: float = 0.0
-    value_change_last_5_minutes: float = 0.0
-    percent_change_last_5_minutes: float = 0.0
+    @computed_field
+    @property
+    def initial_price(self) -> float:
+        """Get initial price from first entry."""
+        if self.prices:
+            return self.prices[-1].price
+        return 100.0
+
+    @computed_field
+    @property
+    def change(self) -> float:
+        """Absolute change from initial price."""
+        return self.price - self.initial_price
+
+    @computed_field
+    @property
+    def percent_change(self) -> float:
+        """Percentage change from initial price."""
+        if self.initial_price == 0:
+            return 0.0
+        return (self.change / self.initial_price) * 100
 
 
 class StockCreate(BaseModel):
     """Schema for creating a stock."""
 
-    nickname: str
-    photo_url: str
+    title: str
+    image: str | None = None
     description: str = ""
+    initial_price: float = 100.0
+
+
+class StockImageUpdate(BaseModel):
+    """Schema for updating stock image."""
+
+    image: str | None
+
+
+class PriceManipulation(BaseModel):
+    """Schema for manipulating stock price."""
+
+    delta: float
+    change_type: ChangeType = ChangeType.ADMIN
 
 
 class SwipeRequest(BaseModel):
     """Schema for a swipe action."""
 
     ticker: str
-    direction: str  # "left" = -0.1, "right" = +0.1
+    direction: str  # "left" or "right"
