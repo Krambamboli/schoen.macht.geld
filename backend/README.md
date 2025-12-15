@@ -31,10 +31,46 @@ src/app/
    config.py         # Settings (env vars)
    database.py       # SQLite async connection
    scheduler.py      # Background price tick scheduler
+   admin.py          # Admin panel configuration
    models/           # SQLModel database models
    schemas/          # Pydantic request/response schemas
    routers/          # API endpoints
+data/
+   stocks.db         # SQLite database (auto-created)
+   images/           # Uploaded stock images
 ```
+
+## Data Models
+
+### Stock
+
+| Field       | Type     | Description                    |
+|-------------|----------|--------------------------------|
+| ticker      | str      | Primary key (4 chars, e.g. "AAPL") |
+| title       | str      | Display name                   |
+| image       | str?     | Image URL or `/images/{file}`  |
+| description | str      | Optional description           |
+| is_active   | bool     | Whether stock is tradeable     |
+| price       | float    | Current price (from latest StockPrice) |
+| prices      | list     | Price history entries          |
+
+### StockPrice
+
+| Field       | Type       | Description                    |
+|-------------|------------|--------------------------------|
+| id          | int        | Auto-increment primary key     |
+| ticker      | str        | Foreign key to Stock           |
+| price       | float      | Price at this point in time    |
+| change_type | ChangeType | Why the price changed          |
+| created_at  | datetime   | Timestamp                      |
+
+### ChangeType Enum
+
+- `initial` - Stock creation
+- `swipe_up` - User swiped right
+- `swipe_down` - User swiped left
+- `random` - Periodic background update
+- `admin` - Manual adjustment
 
 ## API Endpoints
 
@@ -44,9 +80,48 @@ src/app/
 | GET    | /stocks/                | List all stocks          |
 | POST   | /stocks/                | Create new stock         |
 | GET    | /stocks/{ticker}        | Get stock by ticker      |
-| PATCH  | /stocks/{ticker}/image  | Update stock image       |
+| PATCH  | /stocks/{ticker}/image  | Update stock image URL   |
+| POST   | /stocks/{ticker}/image  | Upload stock image       |
 | POST   | /stocks/{ticker}/price  | Manipulate stock price   |
 | POST   | /swipe/                 | Record swipe action      |
+| GET    | /images/{filename}      | Serve uploaded images    |
+
+### Create Stock
+
+```bash
+curl -X POST http://localhost:8000/stocks/ \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Apple", "initial_price": 100.0}'
+```
+
+### Upload Image
+
+```bash
+curl -X POST http://localhost:8000/stocks/APPL/image \
+  -F "file=@photo.jpg"
+```
+
+### Manipulate Price
+
+```bash
+curl -X POST http://localhost:8000/stocks/APPL/price \
+  -H "Content-Type: application/json" \
+  -d '{"delta": 5.0, "change_type": "admin"}'
+```
+
+## Admin Panel
+
+Access at `/admin`. Features:
+
+- **Stocks**: View, create, edit, search stocks
+- **Stock Prices**: View price history (read-only)
+
+## Background Scheduler
+
+When enabled, the scheduler periodically applies random price changes (±5%) to all active stocks. Configure via:
+
+- `PRICE_TICK_INTERVAL` - Seconds between updates (default: 60)
+- `PRICE_TICK_ENABLED` - Enable/disable (default: true)
 
 ## Configuration
 
@@ -57,9 +132,11 @@ Environment variables (or `.env` file):
 | DATABASE_URL        | sqlite+aiosqlite:///./data/stocks.db | SQLite database path               |
 | DEBUG               | false                                | Enable debug mode                  |
 | CORS_ORIGINS        | ["http://localhost:3000"]            | Allowed CORS origins               |
-| LOGURU_LEVEL        | DEBUG                                | Log level (loguru)                 |
+| LOGURU_LEVEL        | INFO                                 | Log level (loguru)                 |
 | PRICE_TICK_INTERVAL | 60                                   | Seconds between random price ticks |
 | PRICE_TICK_ENABLED  | true                                 | Enable background price updates    |
+| IMAGE_DIR           | ./data/images                        | Directory for uploaded images      |
+| MAX_IMAGE_SIZE      | 5242880                              | Max image upload size (bytes)      |
 
 ## Development
 
@@ -77,16 +154,16 @@ The following changes need to be made in the frontend:
 
 ### Stock Model Changes
 
-| Old Field       | New Field    | Notes                          |
-|-----------------|--------------|--------------------------------|
-| `nickname`      | `title`      | Renamed                        |
-| `photo_url`     | `image`      | Renamed, now nullable          |
-| `current_value` | `price`      | Computed from latest StockPrice|
-| `initial_value` | `initial_price` | Computed from first StockPrice |
-| `rank`          | -            | Removed                        |
-| `previous_rank` | -            | Removed                        |
-| `history`       | `prices`     | Renamed                        |
-| -               | `is_active`  | New field (boolean)            |
+| Old Field       | New Field      | Notes                           |
+|-----------------|----------------|---------------------------------|
+| `nickname`      | `title`        | Renamed                         |
+| `photo_url`     | `image`        | Renamed, now nullable           |
+| `current_value` | `price`        | Computed from latest StockPrice |
+| `initial_value` | `initial_price`| Computed from first StockPrice  |
+| `rank`          | -              | Removed                         |
+| `previous_rank` | -              | Removed                         |
+| `history`       | `prices`       | Renamed                         |
+| -               | `is_active`    | New field (boolean)             |
 
 ### StockPrice (formerly PriceHistory) Changes
 
@@ -96,14 +173,6 @@ The following changes need to be made in the frontend:
 | `timestamp` | `created_at`  | Renamed                    |
 | -           | `id`          | New field (auto-increment) |
 | -           | `change_type` | New field (enum)           |
-
-### ChangeType Enum Values
-
-- `initial` - Stock creation
-- `swipe_up` - User swiped right
-- `swipe_down` - User swiped left
-- `random` - Periodic random update
-- `admin` - Manual admin adjustment
 
 ### StockCreate Request Changes
 
@@ -115,8 +184,15 @@ The following changes need to be made in the frontend:
 
 ### New Endpoints
 
-- `PATCH /stocks/{ticker}/image` - Update stock image
+- `PATCH /stocks/{ticker}/image` - Update stock image URL
   - Body: `{ "image": "url" | null }`
+
+- `POST /stocks/{ticker}/image` - Upload stock image file
+  - Content-Type: `multipart/form-data`
+  - Field: `file` (image file)
+  - Allowed types: JPEG, PNG, GIF, WebP
+  - Max size: 5MB
+  - Returns: Stock with `image` set to `/images/{filename}`
 
 - `POST /stocks/{ticker}/price` - Manipulate stock price
   - Body: `{ "delta": float, "change_type": "admin" | "random" | ... }`

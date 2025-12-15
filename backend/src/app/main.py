@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app.admin import setup_admin
@@ -16,6 +18,11 @@ async def lifespan(app: FastAPI):  # pyright: ignore[reportUnusedParameter]
     """Initialize database and scheduler on startup."""
     logger.info("Starting up")
     await init_db()
+
+    # Create image directory if needed
+    image_dir = Path(settings.image_dir)
+    image_dir.mkdir(parents=True, exist_ok=True)
+
     start_scheduler()
     yield
     stop_scheduler()
@@ -39,6 +46,9 @@ app.add_middleware(
 
 app.include_router(stocks.router, prefix="/stocks", tags=["stocks"])
 app.include_router(swipe.router, prefix="/swipe", tags=["swipe"])
+
+# Serve uploaded images
+app.mount("/images", StaticFiles(directory=settings.image_dir), name="images")
 
 # Admin panel at /admin
 _ = setup_admin(app, engine)

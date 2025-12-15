@@ -2,7 +2,13 @@ from datetime import UTC, datetime
 from enum import Enum
 from functools import partial
 
-from sqlmodel import Field, Relationship, SQLModel
+from fastapi_storages import FileSystemStorage  # pyright: ignore[reportMissingTypeStubs]
+from fastapi_storages.base import StorageImage  # pyright: ignore[reportMissingTypeStubs]
+from fastapi_storages.integrations.sqlalchemy import ImageType  # pyright: ignore[reportMissingTypeStubs]
+from sqlmodel import Column, Field, Relationship, SQLModel
+from sqlmodel._compat import SQLModelConfig
+
+from app.config import settings
 
 
 class ChangeType(str, Enum):
@@ -32,9 +38,12 @@ class StockPrice(SQLModel, table=True):
 class Stock(SQLModel, table=True):
     """Stock database model."""
 
+    __tablename__ = "stock"  # pyright: ignore[reportAssignmentType]
+    model_config = SQLModelConfig(from_attributes=True, arbitrary_types_allowed=True)  # pyright: ignore[reportCallIssue]
+
     ticker: str = Field(max_length=4, primary_key=True)
     title: str = Field(max_length=100)
-    image: str | None = None
+    image: StorageImage | None = Field(sa_column=Column(ImageType(storage=FileSystemStorage(path=settings.image_dir))))
     description: str = ""
     is_active: bool = Field(default=True)
 
@@ -54,11 +63,4 @@ class Stock(SQLModel, table=True):
         """Get current price from latest StockPrice entry."""
         if self.prices:
             return self.prices[0].price
-        return 100.0
-
-    @property
-    def initial_price(self) -> float:
-        """Get initial price from first StockPrice entry."""
-        if self.prices:
-            return self.prices[-1].price
-        return 100.0
+        return settings.base_price

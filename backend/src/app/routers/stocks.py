@@ -8,11 +8,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.database import get_session
 from app.models.stock import ChangeType, Stock, StockPrice
 from app.schemas.stock import (
-    PriceManipulation,
     StockCreate,
     StockImageUpdate,
+    StockPriceUpdate,
     StockResponse,
 )
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 router = APIRouter()
 
@@ -49,7 +51,7 @@ async def create_stock(
     stock = Stock(
         ticker=ticker,
         title=request.title,
-        image=request.image,
+        image=None,
         description=request.description,
     )
     session.add(stock)
@@ -81,32 +83,46 @@ async def get_stock(
     return StockResponse.model_validate(stock)
 
 
-@router.patch("/{ticker}/image")
-async def update_stock_image(
+@router.post("/{ticker}/image")
+async def upload_stock_image(
     ticker: str,
-    request: StockImageUpdate,
+    file: StockImageUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> StockResponse:
-    """Update stock image."""
+    """Upload and store stock image locally."""
     stock = await session.get(Stock, ticker)
     if not stock:
         logger.warning("Stock not found: {}", ticker)
         raise HTTPException(status_code=404, detail="Stock not found")
 
-    stock.image = request.image
+    # Validate content type
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid image type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES)}",
+        )
+
+    # Save file
+    # TODO(mg): Validate file size
+    if stock.image:
+        # TODO(mg): Delete old image
+        pass
+    stock.image = file # pyright: ignore[reportAttributeAccessIssue]
+
+    # Save stock
     stock.updated_at = datetime.now(UTC)
     session.add(stock)
     await session.commit()
     await session.refresh(stock)
 
-    logger.info("Updated image for {}", ticker)
+    logger.info("Uploaded image for {}: {}", ticker, stock.image.path if stock.image else "<no image>")
     return StockResponse.model_validate(stock)
 
 
 @router.post("/{ticker}/price")
-async def manipulate_price(
+async def update_stock_price(
     ticker: str,
-    request: PriceManipulation,
+    request: StockPriceUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> StockResponse:
     """Manipulate stock price."""
@@ -133,6 +149,9 @@ async def manipulate_price(
 
     logger.debug(
         "{} price {} by {:.2f} -> {:.2f}",
-        ticker, request.change_type.value, request.delta, new_price,
+        ticker,
+        request.change_type.value,
+        request.delta,
+        new_price,
     )
     return StockResponse.model_validate(stock)

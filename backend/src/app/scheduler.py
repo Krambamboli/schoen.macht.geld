@@ -1,7 +1,7 @@
 import random
 from datetime import UTC, datetime
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # pyright: ignore[reportMissingTypeStubs]
 from loguru import logger
 from sqlmodel import select
 
@@ -50,7 +50,7 @@ def start_scheduler() -> None:
         logger.info("Price tick scheduler disabled")
         return
 
-    _ = scheduler.add_job(
+    _ = scheduler.add_job(  # pyright: ignore[reportUnknownMemberType]
         tick_prices,
         "interval",
         seconds=settings.price_tick_interval,

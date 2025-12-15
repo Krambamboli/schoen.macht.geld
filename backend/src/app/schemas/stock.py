@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from fastapi import UploadFile
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.models.stock import ChangeType
@@ -63,17 +64,15 @@ class StockCreate(BaseModel):
     initial_price: float = 100.0
 
 
-class StockImageUpdate(BaseModel):
-    """Schema for updating stock image."""
-
-    image: str | None
-
-
-class PriceManipulation(BaseModel):
+class StockPriceUpdate(BaseModel):
     """Schema for manipulating stock price."""
 
     delta: float
     change_type: ChangeType = ChangeType.ADMIN
+
+
+class StockImageUpdate(UploadFile):
+    pass
 
 
 class SwipeRequest(BaseModel):
