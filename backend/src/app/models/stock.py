@@ -4,8 +4,6 @@ from functools import partial
 
 from fastapi_storages import (  # pyright: ignore[reportMissingTypeStubs]
     FileSystemStorage,
-)
-from fastapi_storages.base import (  # pyright: ignore[reportMissingTypeStubs]
     StorageImage,
 )
 from fastapi_storages.integrations.sqlalchemy import (  # pyright: ignore[reportMissingTypeStubs]

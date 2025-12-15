@@ -2,8 +2,8 @@
 .env
 .venv/
 
-# Database
-data/*.db
+# Database & storage
+data/
 
 # Python
 __pycache__/

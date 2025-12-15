@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # Stock base price
-    stock_base_price = 1000.0
+    stock_base_price: float = 1000.0
 
     # Background price tick settings
     price_tick_interval: int = 60  # seconds between random price updates

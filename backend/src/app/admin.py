@@ -10,6 +10,7 @@ class StockAdmin(ModelView, model=Stock):
     column_searchable_list = ["ticker", "title"]
     column_sortable_list = ["ticker", "is_active"]
     column_default_sort = [("ticker", False)]
+    form_include_pk = True
     form_excluded_columns = ["prices", "created_at", "updated_at"]
     can_export = False
 
