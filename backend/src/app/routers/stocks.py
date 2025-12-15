@@ -107,7 +107,7 @@ async def upload_stock_image(
     if stock.image:
         # TODO(mg): Delete old image
         pass
-    stock.image = file # pyright: ignore[reportAttributeAccessIssue]
+    stock.image = file  # pyright: ignore[reportAttributeAccessIssue]
 
     # Save stock
     stock.updated_at = datetime.now(UTC)
@@ -115,7 +115,11 @@ async def upload_stock_image(
     await session.commit()
     await session.refresh(stock)
 
-    logger.info("Uploaded image for {}: {}", ticker, stock.image.path if stock.image else "<no image>")
+    logger.info(
+        "Uploaded image for {}: {}",
+        ticker,
+        stock.image.path if stock.image else "<no image>",
+    )
     return StockResponse.model_validate(stock)
 
 
