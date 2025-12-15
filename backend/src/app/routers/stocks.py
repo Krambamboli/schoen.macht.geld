@@ -38,7 +38,9 @@ async def list_stocks(
 
 @router.post("/")
 async def create_stock(
-    request: StockCreate, session: AsyncSession = Depends(get_session)
+    request: StockCreate,
+    image: StockImageUpdate,
+    session: AsyncSession = Depends(get_session),
 ) -> StockResponse:
     """Create a new stock."""
     ticker = generate_ticker(request.title)
@@ -48,10 +50,12 @@ async def create_stock(
         logger.warning("Ticker {} already exists", ticker)
         raise HTTPException(status_code=400, detail=f"Ticker {ticker} already exists")
 
+    # TODO(mg): Validate image file size
+
     stock = Stock(
         ticker=ticker,
         title=request.title,
-        image=None,
+        image=image,
         description=request.description,
     )
     session.add(stock)
@@ -86,7 +90,7 @@ async def get_stock(
 @router.post("/{ticker}/image")
 async def upload_stock_image(
     ticker: str,
-    file: StockImageUpdate,
+    image: StockImageUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> StockResponse:
     """Upload and store stock image locally."""
@@ -96,18 +100,18 @@ async def upload_stock_image(
         raise HTTPException(status_code=404, detail="Stock not found")
 
     # Validate content type
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+    if image.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid image type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES)}",
         )
 
     # Save file
-    # TODO(mg): Validate file size
+    # TODO(mg): Validate image file size
     if stock.image:
         # TODO(mg): Delete old image
         pass
-    stock.image = file  # pyright: ignore[reportAttributeAccessIssue]
+    stock.image = image  # pyright: ignore[reportAttributeAccessIssue]
 
     # Save stock
     stock.updated_at = datetime.now(UTC)
