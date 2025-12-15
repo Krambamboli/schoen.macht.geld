@@ -63,4 +63,4 @@ class Stock(SQLModel, table=True):
         """Get current price from latest StockPrice entry."""
         if self.prices:
             return self.prices[0].price
-        return settings.base_price
+        return settings.stock_base_price
