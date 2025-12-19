@@ -88,16 +88,22 @@ data/
 ### Create Stock
 
 ```bash
+# Without image
 curl -X POST http://localhost:8000/stocks/ \
   -H "Content-Type: application/json" \
-  -d '{"title": "Apple", "initial_price": 100.0}'
+  -d '{"title": "Apple"}'
+
+# With image (multipart/form-data)
+curl -X POST http://localhost:8000/stocks/ \
+  -F 'request={"title": "Apple"};type=application/json' \
+  -F "image=@photo.jpg"
 ```
 
 ### Upload Image
 
 ```bash
 curl -X POST http://localhost:8000/stocks/APPL/image \
-  -F "file=@photo.jpg"
+  -F "image=@photo.jpg"
 ```
 
 ### Manipulate Price
@@ -176,17 +182,17 @@ The following changes need to be made in the frontend:
 
 ### StockCreate Request Changes
 
-| Old Field   | New Field       | Notes                    |
-|-------------|-----------------|--------------------------|
-| `nickname`  | `title`         | Renamed                  |
-| `photo_url` | `image`         | Renamed, now optional    |
-| -           | `initial_price` | New field (default 100.0)|
+| Old Field   | New Field       | Notes                              |
+|-------------|-----------------|-------------------------------------|
+| `nickname`  | `title`         | Renamed                             |
+| `photo_url` | -               | Removed (use file upload endpoint)  |
+| -           | `initial_price` | New field (default: STOCK_BASE_PRICE)|
 
 ### New Endpoints
 
 - `POST /stocks/{ticker}/image` - Upload stock image file
   - Content-Type: `multipart/form-data`
-  - Field: `file` (image file)
+  - Field: `image` (image file)
   - Allowed types: JPEG, PNG, GIF, WebP
   - Max size: 5MB
   - Returns: Stock with `image` path (served at `/images/`)

@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import UploadFile
 from pydantic import BaseModel, ConfigDict, computed_field
 
+from app.config import settings
 from app.models.stock import ChangeType
 
 
@@ -38,7 +39,7 @@ class StockResponse(BaseModel):
         """Get initial price from first entry."""
         if self.prices:
             return self.prices[-1].price
-        return 100.0
+        return settings.stock_base_price
 
     @computed_field
     @property
@@ -59,9 +60,8 @@ class StockCreate(BaseModel):
     """Schema for creating a stock."""
 
     title: str
-    image: str | None = None
     description: str = ""
-    initial_price: float = 100.0
+    initial_price: float = settings.stock_base_price
 
 
 class StockPriceUpdate(BaseModel):

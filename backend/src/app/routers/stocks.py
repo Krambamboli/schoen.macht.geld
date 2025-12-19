@@ -39,8 +39,8 @@ async def list_stocks(
 @router.post("/")
 async def create_stock(
     request: StockCreate,
-    image: StockImageUpdate,
     session: AsyncSession = Depends(get_session),
+    image: StockImageUpdate | None = None,
 ) -> StockResponse:
     """Create a new stock."""
     ticker = generate_ticker(request.title)
@@ -50,12 +50,18 @@ async def create_stock(
         logger.warning("Ticker {} already exists", ticker)
         raise HTTPException(status_code=400, detail=f"Ticker {ticker} already exists")
 
+    # Validate image if provided
     # TODO(mg): Validate image file size
+    if image and image.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid image type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES)}",
+        )
 
     stock = Stock(
         ticker=ticker,
         title=request.title,
-        image=image,
+        image=image,  # pyright: ignore[reportArgumentType]
         description=request.description,
     )
     session.add(stock)
