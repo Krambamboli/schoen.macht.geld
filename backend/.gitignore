@@ -3,6 +3,7 @@
 .venv/
 
 # Database & storage
+backend.lock
 data/
 backups/
 

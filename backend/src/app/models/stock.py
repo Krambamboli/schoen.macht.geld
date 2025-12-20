@@ -116,6 +116,13 @@ class Stock(SQLModel, table=True):
         return settings.stock_base_price
 
     @property
+    def change(self) -> float | None:
+        """Calculate change from reference price."""
+        if self.reference_price is None or self.reference_price == 0:
+            return None
+        return self.price - self.reference_price
+
+    @property
     def percentage_change(self) -> float | None:
         """Calculate percentage change from reference price."""
         if self.reference_price is None or self.reference_price == 0:

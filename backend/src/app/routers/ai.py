@@ -1,3 +1,5 @@
+import json
+import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,6 +22,8 @@ from app.schemas.ai import (
     HeadlinesResponse,
     MessageResponse,
 )
+from app.services.atlascloud import atlascloud
+from app.services.google_ai import google_ai
 
 router = APIRouter()
 
@@ -232,11 +236,6 @@ async def generate_headlines(
 
     Returns headlines immediately (synchronous generation).
     """
-    import json
-    import re
-
-    from app.services.atlascloud import atlascloud
-    from app.services.google_ai import google_ai
 
     # Clamp count to valid range
     count = max(1, min(10, request.count))
@@ -244,23 +243,20 @@ async def generate_headlines(
     # Get top volatile stocks (sorted by absolute percent change)
     query = select(Stock).limit(count)
     result = await session.exec(query)
-    all_stocks = list(result.all())
-
-    if not all_stocks:
-        return HeadlinesResponse(headlines=[], stocks_used=[])
-
-    # Sort by absolute percent change (most volatile first)
     stocks = sorted(
-        all_stocks,
-        key=lambda s: abs(s.percent_change),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
+        result.all(),
+        key=lambda s: abs(s.percentage_change),  # pyright: ignore[reportArgumentType]
         reverse=True,
     )[:count]
+
+    if not stocks:
+        return HeadlinesResponse(headlines=[], stocks_used=[])
 
     # Build stocks data string for prompt
     stocks_data = "\n".join(
         f"- Börsenkürzel: {s.ticker}, Spitzname: {s.title}, "
         + f"Aktueller Wert: {s.price:.2f} CHF, "
-        + f"Veränderung: {s.change:.2f} CHF ({s.percent_change:.2f}%)"  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+        + f"Veränderung: {s.change:.2f} CHF ({s.percentage_change:.2f}%)"
         for s in stocks
     )
 
@@ -269,7 +265,7 @@ async def generate_headlines(
 
     # Try AtlasCloud first, fall back to Google AI
     try:
-        response = await atlascloud.generate_text(prompt, model)
+        response = await atlascloud.generate_text(prompt, model, max_tokens=10000)
         response_text = str(response["choices"][0]["message"]["content"])  # pyright: ignore[reportAny]
     except Exception as e:
         logger.warning("AtlasCloud failed, trying Google AI: {}", e)

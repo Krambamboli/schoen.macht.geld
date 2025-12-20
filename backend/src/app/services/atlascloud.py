@@ -148,14 +148,17 @@ class AtlasCloudClient:
             raise AtlasCloudTransientError(f"Connection error: {e}") from e
 
     async def generate_text(
-        self, prompt: str, model: str | None = None
+        self,
+        prompt: str,
+        model: str | None = None,
+        max_tokens: int = 500,
     ) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
         """Generate text using chat completion API."""
         model = model or settings.atlascloud_text_model
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 500,
+            "max_tokens": max_tokens,
             "temperature": 1,
             "stream": False,
         }
