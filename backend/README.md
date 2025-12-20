@@ -259,7 +259,7 @@ All settings via environment variables or `.env` file.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| IMAGE_DIR | ./data/images | Storage path |
+| STATIC_DIR | ./data | Storage path |
 | MAX_IMAGE_SIZE | 20971520 | Max upload size (bytes) |
 | IMAGE_MAX_DIMENSION | 1920 | Max width/height |
 | IMAGE_QUALITY | 85 | JPEG quality (1-100) |

@@ -77,6 +77,7 @@ dependencies = [
     { name = "apscheduler" },
     { name = "fastapi" },
     { name = "fastapi-storages" },
+    { name = "filelock" },
     { name = "httpx" },
     { name = "loguru" },
     { name = "pillow" },
@@ -104,6 +105,7 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.11.0" },
     { name = "fastapi", specifier = ">=0.124.4" },
     { name = "fastapi-storages", specifier = ">=0.3.0" },
+    { name = "filelock", specifier = ">=3.20.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pillow", specifier = ">=12.0.0" },
@@ -219,6 +221,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/68/8a/e56d4ade659994c2989091b96642f10554ec3914a40de56a556ffdbbcd26/fastapi_storages-0.3.0.tar.gz", hash = "sha256:f784335fff9cd163b783e842da04c6d9ed1b306fce8995fda109b170d6d453df", size = 6706, upload-time = "2024-02-15T15:14:26.431Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/b5/3fb94b4f329fb2f83ffa54e6941b769deaaaa77f63a9fe70905219dd7339/fastapi_storages-0.3.0-py3-none-any.whl", hash = "sha256:91adb41a80fdef2a84c0f8244c27ade7ff8bd5db9b7fa95c496c06c03e192477", size = 9725, upload-time = "2024-02-15T15:14:27.567Z" },
+]
+
+[[package]]
+name = "filelock"
+version = "3.20.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/23/ce7a1126827cedeb958fc043d61745754464eb56c5937c35bbf2b8e26f34/filelock-3.20.1.tar.gz", hash = "sha256:b8360948b351b80f420878d8516519a2204b07aefcdcfd24912a5d33127f188c", size = 19476, upload-time = "2025-12-15T23:54:28.027Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/7f/a1a97644e39e7316d850784c642093c99df1290a460df4ede27659056834/filelock-3.20.1-py3-none-any.whl", hash = "sha256:15d9e9a67306188a44baa72f569d2bfd803076269365fdea0934385da4dc361a", size = 16666, upload-time = "2025-12-15T23:54:26.874Z" },
 ]
 
 [[package]]

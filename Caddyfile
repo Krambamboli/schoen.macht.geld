@@ -3,7 +3,7 @@
 
 :80 {
     # Serve static images directly (more efficient)
-    handle /images/* {
+    handle /static/* {
         root * /srv
         file_server
     }

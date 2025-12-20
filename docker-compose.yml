@@ -7,7 +7,7 @@ services:
       - ./backend/.env:/app/.env:ro
     environment:
       - DATABASE_URL=sqlite+aiosqlite:///./data/stocks.db
-      - IMAGE_DIR=/app/data/images
+      - STATIC_DIR=/app/data/static
       - ROOT_PATH=/api
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -15,6 +15,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    command: ["uvicorn", "app.main:app", "--root-path", "/api", "--workers", "4"]
 
   frontend:
     build: ./frontend
@@ -39,7 +40,7 @@ services:
       - "8443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./backend/data/images:/srv/images:ro
+      - ./backend/data:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

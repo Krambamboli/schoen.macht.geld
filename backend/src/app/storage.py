@@ -36,11 +36,14 @@ class NonOverwritingFileSystemStorage(FileSystemStorage):
     a file with the same name already exists
     """
 
-    OVERWRITE_EXISTING_FILE: bool = False
+    OVERWRITE_EXISTING_FILES: bool = False
 
 
 # Singleton storage instance
-storage = NonOverwritingFileSystemStorage(path=settings.image_dir)
+IMAGE_DIR = "images"
+storage = NonOverwritingFileSystemStorage(
+    path=str(Path(settings.static_dir) / IMAGE_DIR)
+)
 
 
 def validate_image_size(file: UploadFile) -> None:
@@ -203,7 +206,7 @@ def delete_image(image: StorageImage | str | None) -> bool:
             logger.debug("Deleted image via StorageImage: {}", image.name)
             return True
         # Handle path string (StorageImage extends str, so check it second)
-        path = Path(settings.image_dir) / image
+        path = Path(settings.static_dir) / image
         if path.exists():
             path.unlink()
             logger.debug("Deleted image file: {}", image)

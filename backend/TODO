@@ -160,7 +160,7 @@
   - Now catches: AtlasCloudError, AtlasCloudTransientError, OSError
 
 * [ ] Refactor module-level singletons for testability (OPTIONAL - low priority for party)
-  - storage.py:43 - `storage = NonOverwritingFileSystemStorage(path=settings.image_dir)`
+  - storage.py:43 - `storage = NonOverwritingFileSystemStorage(path=settings.static_dir)`
   - atlascloud.py:134 - `atlascloud = AtlasCloudClient()`
   - These are instantiated at import time, reading settings immediately
   - Makes testing harder (can't inject mock settings)

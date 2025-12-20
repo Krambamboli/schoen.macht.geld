@@ -7,6 +7,6 @@ echo "[$(date -Iseconds)] Starting backup..."
 sqlite3 /data/stocks.db ".backup /backups/stocks.db"
 
 # Sync images and videos
-rsync -a --delete /data/images/ /backups/images/
+rsync -a --delete /data/ /backups/data/
 
 echo "[$(date -Iseconds)] Backup complete"

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 
 from app.config import settings
 from app.models.stock import ChangeType
@@ -42,6 +42,15 @@ class StockResponse(BaseModel):
     price_events: list[PriceEventResponse] = []
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("image", mode="before")
+    @classmethod
+    def extract_image_url(cls, v: object) -> str | None:
+        """Extract the part of an image's path after the STATIC_DIR."""
+        if v is None:
+            return None
+        image_path = "/static/" + str(v).replace(settings.static_dir, "")
+        return image_path
 
     # Reference price from last snapshot (for percentage change calculation)
     reference_price: float | None = None

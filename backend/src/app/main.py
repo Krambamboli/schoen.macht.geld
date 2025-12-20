@@ -5,30 +5,58 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from filelock import FileLock, Timeout
 from loguru import logger
 from sqlalchemy import text
 
 from app.admin import setup_admin
 from app.config import settings
 from app.database import async_session_maker, engine, init_db
+from app.logger import init_logging
 from app.routers import ai, stocks, swipe
-from app.scheduler import scheduler, start_scheduler, stop_scheduler
+from app.scheduler import (
+    AI_IMAGE_DIR,
+    AI_VIDEO_DIR,
+    scheduler,
+    start_scheduler,
+    stop_scheduler,
+)
+from app.storage import IMAGE_DIR
+
+LOCK_PATH = "./backend.lock"
+
+
+init_logging()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # pyright: ignore[reportUnusedParameter]
+async def lifespan(_: FastAPI):
     """Initialize database and scheduler on startup."""
-    logger.info("Starting up")
-    await init_db()
 
-    # Create image directory if needed
-    image_dir = Path(settings.image_dir)
-    image_dir.mkdir(parents=True, exist_ok=True)
+    # Try to acquire file lock (which means that this is the first process to do so
+    #   -> create dirs & run scheduler
+    try:
+        with FileLock(LOCK_PATH, timeout=0):
+            logger.info("Starting up (main)")
+            await init_db()
 
-    start_scheduler()
-    yield
-    stop_scheduler()
-    logger.info("Shutting down")
+            # Create image / AI directories if needed
+            static_path = Path(settings.static_dir)
+            image_dir = static_path / IMAGE_DIR
+            image_dir.mkdir(parents=True, exist_ok=True)
+            ai_image_dir = static_path / AI_VIDEO_DIR
+            ai_image_dir.mkdir(parents=True, exist_ok=True)
+            ai_image_dir = static_path / AI_IMAGE_DIR
+            ai_image_dir.mkdir(parents=True, exist_ok=True)
+
+            start_scheduler()
+            yield
+            stop_scheduler()
+            logger.info("Shutting down (main)")
+    except Timeout:
+        logger.info("Starting up (worker)")
+        yield
+        logger.info("Shutting down (worker)")
 
 
 app = FastAPI(
@@ -36,7 +64,6 @@ app = FastAPI(
     description="Backend for the stock exchange party game",
     version="0.1.0",
     lifespan=lifespan,
-    root_path=settings.root_path,
 )
 
 app.add_middleware(
@@ -53,7 +80,7 @@ app.include_router(swipe.router, prefix="/swipe", tags=["swipe"])
 app.include_router(ai.router, prefix="/ai", tags=["ai"])
 
 # Serve uploaded images
-app.mount("/images", StaticFiles(directory=settings.image_dir), name="images")
+app.mount("/static", StaticFiles(directory=settings.static_dir), name="data")
 
 # Admin panel at /admin
 _ = setup_admin(app, engine)
@@ -98,9 +125,9 @@ async def health_check():
 
     # Check disk space
     try:
-        image_path = Path(settings.image_dir)
-        if image_path.exists():
-            disk = shutil.disk_usage(image_path)
+        static_path = Path(settings.static_dir)
+        if static_path.exists():
+            disk = shutil.disk_usage(static_path)
             free_gb = disk.free / (1024**3)
             checks["disk"] = {
                 "status": "ok" if free_gb > 1 else "low",

@@ -334,6 +334,7 @@ export default function RegistrationClient() {
               <div className="aspect-video w-full rounded-md overflow-hidden bg-muted border relative flex items-center justify-center">
                 {photoDataUrl ? (
                   <Image
+                    unoptimized
                     src={photoDataUrl}
                     alt="Dein Foto"
                     layout="fill"

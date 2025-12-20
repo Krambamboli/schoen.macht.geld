@@ -11,21 +11,21 @@
 A satirical stock exchange game where party guests become tradeable "stocks". Guests can interact with the market through swipe-based games, affecting stock prices in real-time. Multiple display screens show live market visualizations.
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    CENTRAL SERVER (Pi 4 / Laptop)                   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │              Docker Compose Stack (root level)               │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌───────┐  ┌────────┐         │   │
-│  │  │ Frontend │  │ Backend  │  │ Caddy │  │ Backup │         │   │
-│  │  │ Next.js  │  │ FastAPI  │  │ Proxy │  │ SQLite │         │   │
-│  │  │  :3000   │  │  :8000   │  │ :80   │  │ Cron   │         │   │
-│  │  └────┬─────┘  └────┬─────┘  └───┬───┘  └────────┘         │   │
-│  │       └─────────────┴────────────┘                          │   │
-│  │                      ↑ internal network                     │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                         port 80 (HTTP)                              │
-└──────────────────────────────┼──────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│               CENTRAL SERVER (Pi 4 / Laptop)              │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │          Docker Compose Stack (root level)         │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌───────┐  ┌────────┐ │   │
+│  │  │ Frontend │  │ Backend  │  │ Caddy │  │ Backup │ │   │
+│  │  │ Next.js  │  │ FastAPI  │  │ Proxy │  │ SQLite │ │   │
+│  │  │  :3000   │  │  :8000   │  │ :80   │  │ Cron   │ │   │
+│  │  └────┬─────┘  └────┬─────┘  └───┬───┘  └────────┘ │   │
+│  │       └─────────────┴────────────┘                 │   │
+│  │                      ↑ internal network            │   │
+│  └────────────────────────────────────────────────────┘   │
+│                              │                            │
+│                         port 80 (HTTP)                    │
+└──────────────────────────────┼────────────────────────────┘
                                │
               Private WiFi Network (no guest access)
          ┌─────────────┬───────┴───────┬─────────────┐
@@ -214,8 +214,8 @@ curl http://localhost/health
 
 ### Backend (`backend/.env`)
 ```env
-DATABASE_URL=sqlite+aiosqlite:///./data/stocks.db
-IMAGE_DIR=/app/data/images
+DATABASE_URL=sqlite+aiosqlite:////app/data/stocks.db
+STATIC_DIR=/app/data/static
 
 # AI Configuration
 GEMINI_API_KEY=...

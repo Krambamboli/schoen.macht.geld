@@ -33,7 +33,7 @@ COPY alembic.ini ./
 COPY migrations/ migrations/
 
 # Create data directories
-RUN mkdir -p /app/data/images
+RUN mkdir -p /app/data/static
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
@@ -41,8 +41,8 @@ ENV PYTHONPATH="/app/src"
 ENV PYTHONUNBUFFERED=1
 
 # Default configuration (can be overridden)
-ENV DATABASE_URL="sqlite+aiosqlite:///./data/stocks.db"
-ENV IMAGE_DIR="/app/data/images"
+ENV DATABASE_URL="sqlite+aiosqlite:////app/data/stocks.db"
+ENV STATIC_DIR="/app/data/static"
 ENV UVICORN_HOST="0.0.0.0"
 ENV UVICORN_PORT="8000"
 ENV UVICORN_WORKERS="4"
@@ -54,4 +54,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Run the application
-CMD ["python", "-m", "app"]
+CMD ["uvicorn", "run", "app.main:app", "--root-path", "${ROOT_PATH}", "--host", "${UVICORN_HOST:-127.0.0.1}", "--port", "${UVICORN_PORT:-8000}", "--workers", "${UVICORN_WORKERS:-1}"]

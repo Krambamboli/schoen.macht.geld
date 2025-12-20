@@ -25,6 +25,10 @@ from app.services.google_ai import GoogleAIError, google_ai
 scheduler = AsyncIOScheduler()
 
 
+AI_IMAGE_DIR = "ai_images"
+AI_VIDEO_DIR = "ai_videos"
+
+
 async def tick_prices() -> None:
     """Apply random price changes to all active stocks."""
     async with async_session_maker() as session:
@@ -331,26 +335,23 @@ async def _poll_task(task: AITask, session: AsyncSession) -> None:
 
 async def _download_result(task: AITask, url: str) -> None:
     """Download generated media and save locally."""
-    # Determine file extension
+    # Determine directory & file extension
+    static_path = Path(settings.static_dir)
     if task.task_type == TaskType.IMAGE:
         ext = ".png"
-        subdir = "ai_images"
+        dl_path = static_path / AI_IMAGE_DIR
     elif task.task_type == TaskType.VIDEO:
         ext = ".mp4"
-        subdir = "ai_videos"
+        dl_path = static_path / AI_VIDEO_DIR
     else:
         return
-
-    # Create output directory
-    output_dir = Path(settings.image_dir).parent / subdir
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Download file
     content = await atlascloud.download_file(url)
 
     # Save with task ID as filename
     filename = f"{task.id}{ext}"
-    filepath = output_dir / filename
+    filepath = dl_path / filename
     _ = filepath.write_bytes(content)
 
     task.result = str(filepath)

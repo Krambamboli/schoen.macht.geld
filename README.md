@@ -185,7 +185,7 @@ The backup container creates consistent SQLite snapshots every 10 minutes:
 ```
 ./backend/data/          →  ./backend/backups/
 ├── stocks.db                ├── stocks.db (atomic copy)
-└── images/                  └── images/ (rsync)
+└── static/                  └── static/ (rsync)
 ```
 
 **Pull backups to another machine:**
@@ -198,7 +198,7 @@ rsync -az pi@server:/path/to/backend/backups/ ~/party-backups/
 
 ```bash
 cp ~/party-backups/stocks.db ./backend/data/
-cp -r ~/party-backups/images/* ./backend/data/images/
+cp -r ~/party-backups/static ./backend/data/
 docker compose up -d
 ```
 

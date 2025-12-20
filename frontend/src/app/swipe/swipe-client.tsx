@@ -141,6 +141,7 @@ export default function SwipeClient() {
           <Card className="relative w-full h-full overflow-hidden shadow-2xl shadow-black/20">
             <div className="absolute inset-0 w-full h-full">
               <Image
+                unoptimized
                 src={imageUrl}
                 alt={currentStock.title}
                 data-ai-hint="person portrait"

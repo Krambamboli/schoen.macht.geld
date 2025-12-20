@@ -7,7 +7,7 @@ Run with: python -m scripts.seed_data
 import asyncio
 import httpx
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8080/api"
 
 PLACEHOLDER_IMAGES = [
     "https://images.unsplash.com/photo-1600180758890-6b94519a8ba6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400",
