@@ -53,12 +53,7 @@ async def lifespan(_: FastAPI):
 
             start_scheduler()
 
-            # Start screenshot service if enabled
-            if settings.screenshot_enabled:
-                try:
-                    await screenshot_service.start()
-                except Exception as e:
-                    logger.error("Failed to start screenshot service: {}", e)
+            # Screenshot service starts lazily on first request
 
             yield
 

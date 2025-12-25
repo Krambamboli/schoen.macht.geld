@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import Response, StreamingResponse
 
+from app.config import settings
 from app.services.screenshot import screenshot_service
 
 router = APIRouter()
@@ -15,7 +16,7 @@ router = APIRouter()
 async def list_views() -> dict[str, list[str] | bool]:
     """List available screenshot views."""
     return {
-        "views": screenshot_service.views,
+        "views": settings.screenshot_views,
         "running": screenshot_service.is_running,
     }
 
@@ -26,12 +27,9 @@ async def get_screenshot(
 ) -> Response:
     """Get a single screenshot as JPEG.
 
-    Fast endpoint for Pi to poll - page is already loaded in memory.
+    Fast endpoint for Pi to poll - service starts lazily on first request.
     """
-    if not screenshot_service.is_running:
-        raise HTTPException(status_code=503, detail="Screenshot service not running")
-
-    if view not in screenshot_service.views:
+    if view not in settings.screenshot_views:
         raise HTTPException(status_code=404, detail=f"Unknown view: {view}")
 
     try:
@@ -55,10 +53,7 @@ async def stream_view(
     Pi can open this directly with mpv or ffplay:
        mpv --no-cache http://localhost:8080/api/screenshot/stream/leaderboard
     """
-    if not screenshot_service.is_running:
-        raise HTTPException(status_code=503, detail="Screenshot service not running")
-
-    if view not in screenshot_service.views:
+    if view not in settings.screenshot_views:
         raise HTTPException(status_code=404, detail=f"Unknown view: {view}")
 
     interval = 1.0 / fps
@@ -89,9 +84,6 @@ async def stream_view(
 @router.post("/reload")
 async def reload_all_views() -> dict[str, str]:
     """Reload all view pages (useful after frontend changes)."""
-    if not screenshot_service.is_running:
-        raise HTTPException(status_code=503, detail="Screenshot service not running")
-
     await screenshot_service.reload_all()
     return {"status": "ok", "message": "All views reloaded"}
 
@@ -101,10 +93,7 @@ async def reload_view(
     view: Annotated[str, Path(description="View name to reload")],
 ) -> dict[str, str]:
     """Reload a specific view page."""
-    if not screenshot_service.is_running:
-        raise HTTPException(status_code=503, detail="Screenshot service not running")
-
-    if view not in screenshot_service.views:
+    if view not in settings.screenshot_views:
         raise HTTPException(status_code=404, detail=f"Unknown view: {view}")
 
     await screenshot_service.reload_page(view)

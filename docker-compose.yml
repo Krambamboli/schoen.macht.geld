@@ -10,7 +10,7 @@ services:
       - STATIC_DIR=/app/data/static
       - ROOT_PATH=/api
       - BASE_URL=${BASE_URL:-http://localhost:8080}
-      - SCREENSHOT_FRONTEND_URL=http://frontend:3000
+      - SCREENSHOT_FRONTEND_URL=http://caddy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 30s
@@ -23,7 +23,7 @@ services:
     build: ./frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=/api
+      - NEXT_PUBLIC_API_URL=
     depends_on:
       backend:
         condition: service_healthy

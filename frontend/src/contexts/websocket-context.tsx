@@ -31,12 +31,12 @@ function getWebSocketUrl(): string {
   // If absolute URL, convert http(s) to ws(s)
   if (apiUrl.startsWith('http')) {
     const wsUrl = apiUrl.replace(/^http/, 'ws');
-    return `${wsUrl}/api/stocks/ws`;
+    return `${wsUrl}/stocks/ws`;
   }
 
   // Relative URL - use current host
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}${apiUrl}/api/stocks/ws`;
+  return `${protocol}//${window.location.host}${apiUrl}/stocks/ws`;
 }
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {

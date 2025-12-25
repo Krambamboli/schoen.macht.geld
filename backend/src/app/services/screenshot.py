@@ -23,6 +23,7 @@ class ScreenshotService:
         self._browser: Browser | None = None
         self._pages: dict[str, Page] = {}
         self._lock = asyncio.Lock()
+        self._init_lock = asyncio.Lock()
         self._running = False
 
     @property
@@ -32,6 +33,14 @@ class ScreenshotService:
     @property
     def views(self) -> list[str]:
         return list(self._pages.keys())
+
+    async def _ensure_started(self) -> None:
+        """Lazily start the service if not already running."""
+        if self._running:
+            return
+        async with self._init_lock:
+            if not self._running:
+                await self.start()
 
     async def start(self) -> None:
         """Start the browser and pre-load all view pages."""
@@ -108,8 +117,10 @@ class ScreenshotService:
     async def capture(self, view: str) -> bytes:
         """Capture a screenshot of a view as JPEG bytes.
 
-        Fast path - page is already loaded and ready.
+        Lazily starts the service on first call.
         """
+        await self._ensure_started()
+
         page = self._pages.get(view)
         if not page:
             raise ValueError(f"Unknown view: {view}")
@@ -122,6 +133,8 @@ class ScreenshotService:
 
     async def capture_to_file(self, view: str) -> Path:
         """Capture a screenshot and save to file."""
+        await self._ensure_started()
+
         page = self._pages.get(view)
         if not page:
             raise ValueError(f"Unknown view: {view}")
@@ -139,6 +152,8 @@ class ScreenshotService:
 
     async def capture_all(self) -> dict[str, bytes]:
         """Capture all views in parallel."""
+        await self._ensure_started()
+
         if not self._pages:
             return {}
 
@@ -153,6 +168,8 @@ class ScreenshotService:
 
     async def capture_all_to_files(self) -> dict[str, Path]:
         """Capture all views to files."""
+        await self._ensure_started()
+
         if not self._pages:
             return {}
 
@@ -165,6 +182,8 @@ class ScreenshotService:
 
     async def reload_page(self, view: str) -> None:
         """Reload a specific view page."""
+        await self._ensure_started()
+
         page = self._pages.get(view)
         if page:
             _ = await page.reload(wait_until="networkidle")
@@ -172,6 +191,8 @@ class ScreenshotService:
 
     async def reload_all(self) -> None:
         """Reload all view pages."""
+        await self._ensure_started()
+
         for view in self._pages:
             await self.reload_page(view)
 
