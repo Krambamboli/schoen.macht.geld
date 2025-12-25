@@ -26,6 +26,7 @@ const HEADLINE_SEPARATOR = ' +++ ';
 const NewsTicker = ({ stocks }: { stocks: StockResponse[] }) => {
   const [headlineQueue, setHeadlineQueue] = useState<string[]>([]);
   const hasLoadedAi = useRef(false);
+  const hasFetchedOnMount = useRef(false);
 
   // Generate fallback headlines from top movers
   const fallbackHeadlines = useMemo(() => {
@@ -75,7 +76,11 @@ const NewsTicker = ({ stocks }: { stocks: StockResponse[] }) => {
 
   // Fetch headlines on mount and every 2 minutes
   useEffect(() => {
-    fetchHeadlines();
+    if (!hasFetchedOnMount.current) {
+      hasFetchedOnMount.current = true;
+      fetchHeadlines();
+    }
+
     const interval = setInterval(fetchHeadlines, 120000);
     return () => clearInterval(interval);
   }, [fetchHeadlines]);
