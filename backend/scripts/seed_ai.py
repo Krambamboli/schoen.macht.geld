@@ -43,10 +43,11 @@ veranstaltet vom "Verein für ambitionierten Konsum (VAK)" im Club "Amphitheater
 
 Generiere {count} einzigartige, fiktive "Party-Persönlichkeiten" als Aktien.
 Jede Person braucht:
-1. **ticker**: Genau 4 Grossbuchstaben (z.B. "DIAM", "KRYP", "NEON")
-2. **title**: Ein kreativer Spitzname mit Bindestrich (z.B. "Diamond-Hands", "Krypto-König", "Neon-Ninja")
-3. **description**: Eine sarkastische Ich-Perspektive Beschreibung (max 350 Zeichen).
+1. **ticker**: Genau 4 Grossbuchstaben (z.B. "DIAM", "KRYP", "NEON", "MARC")
+2. **title**: Ein kreativer Spitzname (z.B. "Diamond Hands AG", "Krypto-König-Kammeradschaft", "Inkasso Moskaug GmbH.", "Marc's Super Stock")
+3. **description**: Eine sarkastische Ich-Perspektive Beschreibung (max 500 Zeichen).
    Themen: Zürcher Nachtleben, Konsum, Status, Exzesse, Finanzjargon gemischt mit Party-Slang.
+   Stil: Selbstverliebt, sarkastisch, satirisch, amüsierter/amüsanter Unterton. Potentiell etwas klamaukig.
 
 Die Ticker müssen alle unterschiedlich sein!
 
@@ -56,7 +57,7 @@ Gib die Daten als JSON-Array aus:
   ...
 ]
 
-Nur das JSON-Array, kein anderer Text."""
+SEHR WICHTIG: Nur das JSON-Array, kein anderer Text."""
 
 # Fallback prompt for description only
 DESCRIPTION_PROMPT = """Du bist ein Ghostwriter für die Zürcher Partyszene.
@@ -66,10 +67,11 @@ Spitzname: {title}
 
 Regeln:
 - Ich-Perspektive
-- Selbstverliebt, sarkastisch, satirisch
+- Selbstverliebt, sarkastisch, satirisch, amüsierter/amüsanter Unterton. Potentiell etwas klamaukig
 - Finanzjargon mit Party-Slang mischen
-- Max 350 Zeichen
+- Max 500 Zeichen
 - Deutsch
+- Themen: Zürcher Nachtleben, Konsum, Status, Exzesse, Finanzjargon gemischt mit Party-Slang
 
 Gib nur die Beschreibung aus."""
 
@@ -78,7 +80,7 @@ async def generate_stocks_batch(count: int) -> list[dict]:
     """Generate a single batch of stocks (max 10)."""
     prompt = STOCK_GENERATION_PROMPT.format(count=count)
 
-    response_text = await ai.generate_text(prompt, max_tokens=5000)
+    response_text = await ai.generate_text(prompt, max_tokens=8000)
 
     # Parse JSON from response
     json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
@@ -118,7 +120,7 @@ async def generate_description(title: str) -> str:
     prompt = DESCRIPTION_PROMPT.format(title=title)
 
     try:
-        return await ai.generate_text(prompt, max_tokens=500)
+        return await ai.generate_text(prompt, max_tokens=800)
     except AIError:
         return f"Ich bin {title}. Mehr musst du nicht wissen."
 
