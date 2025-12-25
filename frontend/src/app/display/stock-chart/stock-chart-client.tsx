@@ -48,8 +48,8 @@ export default function StockChartClient() {
 
   if (isLoading || !activeStock) {
     return (
-      <div className="flex items-center justify-center h-full text-white bg-black">
-        Lade Chart-Daten...
+      <div className="flex items-center justify-center h-full text-primary bg-black">
+        <span className="text-2xl blink-cursor">LADE CHART-DATEN</span>
       </div>
     );
   }
@@ -65,21 +65,28 @@ export default function StockChartClient() {
 
   const isPositive = activeStock.percent_change >= 0;
   const imageUrl = activeStock.image || '/placeholder.png';
+  const lineColor = isPositive ? '#22c55e' : '#ef4444';
+  const gridColor = 'rgba(255, 153, 0, 0.2)';
 
   return (
-    <div className="w-full h-full p-6 flex flex-col bg-black text-white">
+    <div className="w-full h-full flex flex-col bg-black text-primary">
+      {/* Stock counter */}
+      <div className="flex items-center justify-end px-4 py-1 border-b border-border bg-black">
+        <span className="text-sm text-muted-foreground">{currentIndex + 1}/{stocks?.length || 0} TITEL │ NÄCHSTER IN 20s</span>
+      </div>
+
       <AnimatePresence mode="wait">
         <motion.div
           key={activeStock.ticker}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, transition: { duration: 1 } }}
           exit={{ opacity: 0, transition: { duration: 1 } }}
-          className="flex-1 flex flex-col"
+          className="flex-1 flex flex-col p-4"
         >
-          {/* Header */}
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-6">
-              <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-gray-700">
+          {/* Stock Header */}
+          <div className="flex items-start justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-4">
+              <div className="relative w-24 h-24 overflow-hidden border-2 border-primary">
                 <Image
                   unoptimized
                   src={imageUrl}
@@ -89,26 +96,26 @@ export default function StockChartClient() {
                 />
               </div>
               <div>
-                <h1 className="text-6xl font-bold">{activeStock.title}</h1>
-                <p className="text-3xl text-gray-400 font-mono">{activeStock.ticker}</p>
+                <h1 className="text-4xl font-bold text-primary">{activeStock.title}</h1>
+                <p className="text-2xl text-accent font-bold">{activeStock.ticker}</p>
               </div>
             </div>
             <div className="flex flex-col items-end">
               <span
                 className={cn(
-                  'text-7xl font-mono font-bold',
-                  isPositive ? 'text-green-400' : 'text-red-500'
+                  'text-5xl font-bold led-glow',
+                  isPositive ? 'text-green-500' : 'text-red-500'
                 )}
               >
-                {activeStock.price.toFixed(2)} <span className="text-5xl">CHF</span>
+                {activeStock.price.toFixed(2)} <span className="text-3xl text-muted-foreground">CHF</span>
               </span>
               <div
                 className={cn(
-                  'flex items-center justify-end gap-3 text-4xl font-bold mt-1',
-                  isPositive ? 'text-green-400' : 'text-red-500'
+                  'flex items-center justify-end gap-2 text-2xl font-bold mt-1',
+                  isPositive ? 'text-green-500' : 'text-red-500'
                 )}
               >
-                {isPositive ? <ArrowUp size={36} /> : <ArrowDown size={36} />}
+                {isPositive ? <ArrowUp size={28} /> : <ArrowDown size={28} />}
                 <span>
                   {isPositive ? '+' : ''}
                   {activeStock.change.toFixed(2)} ({activeStock.percent_change.toFixed(2)}%)
@@ -118,44 +125,49 @@ export default function StockChartClient() {
           </div>
 
           {/* Chart */}
-          <div className="flex-1 mt-6">
+          <div className="flex-1 mt-4 border border-border p-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                 <defs>
                   <linearGradient id={`color-${isPositive}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor={isPositive ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 72.2% 50.6%)'}
-                      stopOpacity={0.8}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={isPositive ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 72.2% 50.6%)'}
-                      stopOpacity={0}
-                    />
+                    <stop offset="5%" stopColor={lineColor} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={lineColor} stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-                <XAxis dataKey="timestamp" tick={{ fill: 'white' }} tickLine={{ stroke: 'white' }} />
+                <CartesianGrid
+                  strokeDasharray="1 1"
+                  stroke={gridColor}
+                  strokeWidth={1}
+                  horizontal={true}
+                  vertical={true}
+                />
+                <XAxis
+                  dataKey="timestamp"
+                  tick={{ fill: '#ff9900', fontSize: 12 }}
+                  tickLine={{ stroke: '#ff9900' }}
+                  axisLine={{ stroke: '#ff9900', strokeWidth: 2 }}
+                />
                 <YAxis
                   domain={['dataMin - 1', 'dataMax + 1']}
-                  tick={{ fill: 'white' }}
-                  tickLine={{ stroke: 'white' }}
+                  tick={{ fill: '#ff9900', fontSize: 12 }}
+                  tickLine={{ stroke: '#ff9900' }}
+                  axisLine={{ stroke: '#ff9900', strokeWidth: 2 }}
+                  tickFormatter={(value) => value.toFixed(0)}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    border: '1px solid #555',
-                    color: 'white',
+                    backgroundColor: '#000',
+                    border: '2px solid #ff9900',
+                    color: '#ff9900',
                   }}
-                  labelStyle={{ fontWeight: 'bold' }}
-                  formatter={(value: number) => [`${value.toFixed(2)} CHF`, 'Wert']}
+                  labelStyle={{ fontWeight: 'bold', color: '#ffcc00' }}
+                  formatter={(value: number) => [`${value.toFixed(2)} CHF`, 'WERT']}
                 />
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke={isPositive ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 72.2% 50.6%)'}
-                  strokeWidth={3}
+                  stroke={lineColor}
+                  strokeWidth={4}
                   fillOpacity={1}
                   fill={`url(#color-${isPositive})`}
                   isAnimationActive={false}
@@ -163,6 +175,7 @@ export default function StockChartClient() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+
         </motion.div>
       </AnimatePresence>
     </div>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { Crown, Sparkles } from 'lucide-react';
+import { Crown } from 'lucide-react';
 import type { StockEvent } from '@/contexts/events-context';
 
 interface NewLeaderCelebrationProps {
@@ -11,35 +11,24 @@ interface NewLeaderCelebrationProps {
   onComplete: () => void;
 }
 
-const ANIMATION_DURATION = 8000; // 8 seconds total
+const ANIMATION_DURATION = 8000;
 
 export function NewLeaderCelebration({ event, onComplete }: NewLeaderCelebrationProps) {
-  const [phase, setPhase] = useState<'intro' | 'reveal' | 'confetti' | 'exit'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'reveal' | 'ticker' | 'exit'>('intro');
   const stock = event.stock;
 
   useEffect(() => {
-    // Phase timing
     const timers = [
       setTimeout(() => setPhase('reveal'), 1000),
-      setTimeout(() => setPhase('confetti'), 2500),
+      setTimeout(() => setPhase('ticker'), 2500),
       setTimeout(() => setPhase('exit'), ANIMATION_DURATION - 1000),
       setTimeout(onComplete, ANIMATION_DURATION),
     ];
-
     return () => timers.forEach(clearTimeout);
   }, [onComplete]);
 
-  // Generate confetti particles - more particles for fuller effect
-  const confetti = Array.from({ length: 150 }).map((_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    delay: Math.random() * 1.5,
-    duration: 2 + Math.random() * 3,
-    color: ['#FFD700', '#FFA500', '#FF6347', '#00CED1', '#9370DB', '#32CD32', '#FF69B4', '#00FF7F'][i % 8],
-    size: 6 + Math.random() * 12,
-    rotation: Math.random() * 360,
-    swayAmount: 20 + Math.random() * 40,
-  }));
+  // Ticker tape characters
+  const tickerText = `████ NEUER #1 ████ ${stock.ticker} ████ ${stock.price.toFixed(2)} CHF ████ NEUER SPITZENREITER ████ `;
 
   return (
     <AnimatePresence>
@@ -47,172 +36,169 @@ export function NewLeaderCelebration({ event, onComplete }: NewLeaderCelebration
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] flex flex-col bg-black"
         onClick={onComplete}
       >
-        {/* Spotlight effect */}
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 0.3 }}
-          transition={{ duration: 1, ease: 'easeOut' }}
-          className="absolute inset-0 bg-gradient-radial from-yellow-400/40 via-transparent to-transparent"
+        {/* Scanline overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-20 z-50"
+          style={{
+            background: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)'
+          }}
         />
 
-        {/* Confetti */}
-        {phase === 'confetti' &&
-          confetti.map((particle) => (
-            <motion.div
-              key={particle.id}
-              initial={{
-                y: -20,
-                rotate: 0,
-                opacity: 1,
-              }}
-              animate={{
-                y: '110vh',
-                x: [0, particle.swayAmount, -particle.swayAmount, 0],
-                rotate: particle.rotation + 720,
-                opacity: [1, 1, 1, 0],
-              }}
-              transition={{
-                duration: particle.duration,
-                delay: particle.delay,
-                ease: 'linear',
-                x: {
-                  duration: particle.duration / 2,
-                  repeat: 2,
-                  ease: 'easeInOut',
-                },
-              }}
-              className="absolute top-0"
-              style={{
-                left: `${particle.x}%`,
-                width: particle.size,
-                height: particle.size,
-                backgroundColor: particle.color,
-                borderRadius: particle.id % 3 === 0 ? '50%' : particle.id % 3 === 1 ? '2px' : '0',
-                transform: particle.id % 2 === 0 ? 'rotate(45deg)' : undefined,
-              }}
-            />
-          ))}
+        {/* Top ticker tape */}
+        <motion.div
+          initial={{ x: '100%' }}
+          animate={{ x: '-100%' }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+          className="bg-primary text-primary-foreground py-2 text-xl font-bold whitespace-nowrap overflow-hidden"
+        >
+          {tickerText.repeat(5)}
+        </motion.div>
+
+        {/* Breaking news header */}
+        <motion.div
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="bg-red-700 text-white py-3 border-y-4 border-red-900"
+        >
+          <div className="flex items-center justify-center gap-4">
+            <motion.span
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+              className="text-2xl font-bold"
+            >
+              ▌▌▌
+            </motion.span>
+            <span className="text-3xl font-bold tracking-widest">BREAKING NEWS</span>
+            <motion.span
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+              className="text-2xl font-bold"
+            >
+              ▐▐▐
+            </motion.span>
+          </div>
+        </motion.div>
 
         {/* Main content */}
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0, y: 50 }}
-          animate={{
-            scale: phase === 'exit' ? 0.8 : 1,
-            opacity: phase === 'exit' ? 0 : 1,
-            y: 0,
-          }}
-          transition={{ type: 'spring', bounce: 0.4, duration: 0.8 }}
-          className="relative text-center"
-        >
-          {/* Crown icon */}
+        <div className="flex-1 flex items-center justify-center p-8">
           <motion.div
-            initial={{ y: -50, opacity: 0, rotate: -10 }}
-            animate={{ y: 0, opacity: 1, rotate: 0 }}
-            transition={{ delay: 0.3, type: 'spring', bounce: 0.6 }}
-            className="flex justify-center mb-4"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{
+              scale: phase === 'exit' ? 0.8 : 1,
+              opacity: phase === 'exit' ? 0 : 1,
+            }}
+            transition={{ type: 'spring', bounce: 0.3, duration: 0.8 }}
+            className="text-center"
           >
-            <div className="relative">
-              <Crown className="w-24 h-24 text-yellow-400 drop-shadow-lg" />
-              <motion.div
-                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <Sparkles className="w-12 h-12 text-yellow-200" />
-              </motion.div>
-            </div>
-          </motion.div>
-
-          {/* "NEW #1" text */}
-          <motion.h1
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.5, type: 'spring', bounce: 0.5 }}
-            className="text-6xl font-bold text-yellow-400 mb-6 tracking-wider"
-            style={{ textShadow: '0 0 40px rgba(250, 204, 21, 0.5)' }}
-          >
-            NEUER SPITZENREITER!
-          </motion.h1>
-
-          {/* Stock card */}
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.8, type: 'spring', bounce: 0.3 }}
-            className="bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-3xl p-8 border-2 border-yellow-500/50 shadow-2xl shadow-yellow-500/20"
-          >
-            {/* Stock image with glow */}
+            {/* Crown with glow */}
             <motion.div
-              animate={{ boxShadow: ['0 0 20px rgba(250, 204, 21, 0.3)', '0 0 60px rgba(250, 204, 21, 0.6)', '0 0 20px rgba(250, 204, 21, 0.3)'] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="relative w-40 h-40 mx-auto rounded-full overflow-hidden border-4 border-yellow-400 mb-6"
+              initial={{ y: -50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="flex justify-center mb-6"
             >
-              {stock.image ? (
-                <Image
-                  unoptimized
-                  src={stock.image}
-                  alt={stock.title}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-yellow-600 to-yellow-800 flex items-center justify-center text-4xl font-bold text-white">
-                  {stock.ticker.slice(0, 2)}
+              <motion.div
+                animate={{
+                  textShadow: ['0 0 20px #ff9900', '0 0 60px #ff9900', '0 0 20px #ff9900']
+                }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                <Crown className="w-20 h-20 text-accent" style={{ filter: 'drop-shadow(0 0 10px #ffcc00)' }} />
+              </motion.div>
+            </motion.div>
+
+            {/* Rank #1 badge */}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.7, type: 'spring' }}
+              className="inline-block mb-6"
+            >
+              <div className="border-4 border-accent bg-black px-8 py-4">
+                <span className="text-8xl font-bold text-accent led-glow">#1</span>
+              </div>
+            </motion.div>
+
+            {/* Stock card - terminal style */}
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="border-2 border-primary bg-black p-6 max-w-md mx-auto"
+            >
+              {/* Stock image */}
+              <motion.div
+                animate={{
+                  boxShadow: ['0 0 10px #ff9900', '0 0 30px #ff9900', '0 0 10px #ff9900']
+                }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="relative w-32 h-32 mx-auto border-2 border-accent overflow-hidden mb-4"
+              >
+                {stock.image ? (
+                  <Image
+                    unoptimized
+                    src={stock.image}
+                    alt={stock.title}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-primary/20 flex items-center justify-center text-3xl font-bold text-primary">
+                    {stock.ticker.slice(0, 2)}
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Stock info */}
+              <h2 className="text-3xl font-bold text-primary mb-1">{stock.title}</h2>
+              <p className="text-xl text-accent font-bold mb-4">{stock.ticker}</p>
+
+              {/* Price display */}
+              <div className="border-t border-b border-border py-4 my-4">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 1.3, type: 'spring' }}
+                  className="text-4xl font-bold text-green-500 led-glow"
+                >
+                  {stock.price.toFixed(2)} <span className="text-2xl text-muted-foreground">CHF</span>
+                </motion.div>
+                <div className={`text-xl font-bold mt-2 ${stock.percent_change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {stock.percent_change >= 0 ? '▲' : '▼'} {stock.percent_change >= 0 ? '+' : ''}{stock.percent_change.toFixed(2)}%
+                </div>
+              </div>
+
+              {/* Previous leader */}
+              {event.metadata?.previousLeader && (
+                <div className="text-sm text-muted-foreground">
+                  <span className="text-red-500">▼</span> ÜBERHOLT: {event.metadata.previousLeader.ticker}
                 </div>
               )}
             </motion.div>
 
-            {/* Stock name */}
-            <h2 className="text-4xl font-bold text-white mb-2">{stock.title}</h2>
-            <p className="text-xl text-yellow-400 font-mono mb-4">{stock.ticker}</p>
-
-            {/* Price */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 1.2, type: 'spring' }}
-              className="text-5xl font-bold text-white font-mono"
-            >
-              {stock.price.toFixed(2)}
-              <span className="text-2xl text-gray-400 ml-2">CHF</span>
-            </motion.div>
-
-            {/* Change */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.5 }}
-              className={`text-2xl font-mono mt-2 ${stock.percent_change >= 0 ? 'text-green-400' : 'text-red-400'}`}
-            >
-              {stock.percent_change >= 0 ? '+' : ''}
-              {stock.percent_change.toFixed(1)}%
-            </motion.div>
-          </motion.div>
-
-          {/* Previous leader mention */}
-          {event.metadata?.previousLeader && (
+            {/* Tap to dismiss */}
             <motion.p
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 2 }}
-              className="mt-6 text-gray-400"
+              animate={{ opacity: 0.5 }}
+              transition={{ delay: 3 }}
+              className="mt-6 text-sm text-muted-foreground"
             >
-              Überholt: {event.metadata.previousLeader.title} ({event.metadata.previousLeader.ticker})
+              ─── TIPPEN ZUM SCHLIESSEN ───
             </motion.p>
-          )}
+          </motion.div>
+        </div>
 
-          {/* Tap to dismiss hint */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
-            transition={{ delay: 3 }}
-            className="mt-8 text-sm text-gray-500"
-          >
-            Tippen zum Schliessen
-          </motion.p>
+        {/* Bottom ticker tape */}
+        <motion.div
+          initial={{ x: '-100%' }}
+          animate={{ x: '100%' }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+          className="bg-primary text-primary-foreground py-2 text-xl font-bold whitespace-nowrap overflow-hidden"
+        >
+          {tickerText.repeat(5)}
         </motion.div>
       </motion.div>
     </AnimatePresence>

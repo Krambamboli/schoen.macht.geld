@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { Rocket, TrendingUp, Star } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import type { StockEvent } from '@/contexts/events-context';
 
 interface AllTimeHighProps {
@@ -14,26 +14,25 @@ interface AllTimeHighProps {
 const ANIMATION_DURATION = 6000;
 
 export function AllTimeHigh({ event, onComplete }: AllTimeHighProps) {
-  const [phase, setPhase] = useState<'launch' | 'soar' | 'celebrate' | 'exit'>('launch');
+  const [phase, setPhase] = useState<'alert' | 'reveal' | 'display' | 'exit'>('alert');
   const stock = event.stock;
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('soar'), 800),
-      setTimeout(() => setPhase('celebrate'), 2000),
+      setTimeout(() => setPhase('reveal'), 800),
+      setTimeout(() => setPhase('display'), 2000),
       setTimeout(() => setPhase('exit'), ANIMATION_DURATION - 800),
       setTimeout(onComplete, ANIMATION_DURATION),
     ];
     return () => timers.forEach(clearTimeout);
   }, [onComplete]);
 
-  // Stars for celebration
-  const stars = Array.from({ length: 30 }).map((_, i) => ({
+  // Generate rising arrow indicators
+  const arrows = Array.from({ length: 20 }).map((_, i) => ({
     id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    delay: Math.random() * 0.5,
-    size: 10 + Math.random() * 20,
+    x: 5 + (i % 10) * 10,
+    delay: Math.random() * 2,
+    duration: 2 + Math.random() * 2,
   }));
 
   return (
@@ -42,125 +41,196 @@ export function AllTimeHigh({ event, onComplete }: AllTimeHighProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden"
-        style={{ background: 'linear-gradient(to top, #1a1a2e, #16213e, #0f3460)' }}
+        className="fixed inset-0 z-[100] flex flex-col bg-black overflow-hidden"
         onClick={onComplete}
       >
-        {/* Stars background */}
-        {phase === 'celebrate' &&
-          stars.map((star) => (
-            <motion.div
-              key={star.id}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: [0, 1, 0], scale: [0, 1, 0] }}
-              transition={{ duration: 1.5, delay: star.delay, repeat: 2 }}
-              className="absolute"
-              style={{ left: `${star.x}%`, top: `${star.y}%` }}
-            >
-              <Star className="text-yellow-400" style={{ width: star.size, height: star.size }} fill="currentColor" />
-            </motion.div>
-          ))}
-
-        {/* Rocket trail */}
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{
-            opacity: phase === 'soar' || phase === 'celebrate' ? 0.6 : 0,
-            height: phase === 'soar' || phase === 'celebrate' ? '100vh' : 0,
+        {/* Scanline overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-20 z-50"
+          style={{
+            background: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)'
           }}
-          transition={{ duration: 1 }}
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 bg-gradient-to-t from-orange-500 via-yellow-400 to-transparent blur-md"
         />
 
-        {/* Rocket with stock */}
+        {/* Rising arrows background */}
+        {phase === 'display' && arrows.map((arrow) => (
+          <motion.div
+            key={arrow.id}
+            initial={{ y: '100vh', opacity: 0 }}
+            animate={{ y: '-20vh', opacity: [0, 0.3, 0] }}
+            transition={{ duration: arrow.duration, delay: arrow.delay, repeat: Infinity }}
+            className="absolute text-4xl text-green-500/30"
+            style={{ left: `${arrow.x}%` }}
+          >
+            ▲
+          </motion.div>
+        ))}
+
+        {/* Alert header bar */}
         <motion.div
-          initial={{ y: '100vh' }}
-          animate={{
-            y: phase === 'launch' ? '60vh' : phase === 'exit' ? '-100vh' : '10vh',
-          }}
-          transition={{
-            type: 'spring',
-            stiffness: phase === 'launch' ? 100 : 50,
-            damping: 15,
-            duration: phase === 'exit' ? 0.8 : undefined,
-          }}
-          className="relative flex flex-col items-center"
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
+          transition={{ type: 'spring', bounce: 0.3 }}
+          className="bg-green-700 border-b-4 border-green-900"
         >
-          {/* Rocket icon */}
-          <motion.div
-            animate={{ rotate: phase === 'soar' ? [0, -5, 5, 0] : 0 }}
-            transition={{ duration: 0.5, repeat: phase === 'soar' ? Infinity : 0 }}
-            className="relative"
-          >
-            <Rocket className="w-32 h-32 text-white -rotate-45" />
-            {/* Flame - positioned at rocket exhaust (bottom-left after -45° rotation) */}
+          <div className="flex items-center justify-center py-3 gap-4">
             <motion.div
-              animate={{ scale: [1, 1.3, 1], opacity: [0.8, 1, 0.8] }}
-              transition={{ duration: 0.2, repeat: Infinity }}
-              className="absolute -bottom-6 left-2 w-16 h-24 bg-gradient-to-t from-orange-600 via-yellow-500 to-transparent rounded-full blur-sm -z-10"
-            />
-          </motion.div>
-
-          {/* Stock card attached to rocket */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 bg-zinc-900/90 backdrop-blur rounded-2xl p-6 border border-green-500/50 shadow-2xl shadow-green-500/20 text-center"
-          >
-            {/* Stock image */}
-            <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-400 mb-4">
-              {stock.image ? (
-                <Image
-                  unoptimized
-                  src={stock.image}
-                  alt={stock.title}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-green-600 to-green-800 flex items-center justify-center text-2xl font-bold text-white">
-                  {stock.ticker.slice(0, 2)}
-                </div>
-              )}
-            </div>
-
-            {/* ALL-TIME HIGH badge */}
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold px-4 py-2 rounded-full mb-3"
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 0.3, repeat: Infinity }}
+              className="text-2xl"
             >
-              <TrendingUp className="w-5 h-5" />
-              ALLZEITHOCH!
+              ▲▲▲
             </motion.div>
-
-            <h2 className="text-2xl font-bold text-white mb-1">{stock.title}</h2>
-            <p className="text-green-400 font-mono mb-3">{stock.ticker}</p>
-
-            {/* New price */}
-            <div className="text-4xl font-bold text-green-400 font-mono">
-              {stock.price.toFixed(2)} CHF
-            </div>
-
-            {/* Previous high */}
-            {event.metadata?.previousPrice && (
-              <p className="text-sm text-gray-400 mt-2">
-                Vorheriges Hoch: {event.metadata.previousPrice.toFixed(2)} CHF
-              </p>
-            )}
-          </motion.div>
+            <span className="text-3xl font-bold text-white tracking-widest">ALLZEITHOCH</span>
+            <motion.div
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 0.3, repeat: Infinity }}
+              className="text-2xl"
+            >
+              ▲▲▲
+            </motion.div>
+          </div>
         </motion.div>
 
-        {/* Tap to dismiss */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ delay: 3 }}
-          className="absolute bottom-8 text-sm text-gray-400"
-        >
-          Tippen zum Schliessen
-        </motion.p>
+        {/* Scrolling ticker */}
+        <div className="bg-green-900/50 border-b border-green-700 overflow-hidden">
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: '-100%' }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+            className="py-1 text-green-400 font-bold whitespace-nowrap"
+          >
+            {'█ NEUES ALLZEITHOCH █ '.repeat(10)} {stock.ticker} █ {stock.price.toFixed(2)} CHF █
+          </motion.div>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{
+              scale: phase === 'exit' ? 0.8 : 1,
+              opacity: phase === 'exit' ? 0 : 1,
+            }}
+            transition={{ type: 'spring', bounce: 0.3 }}
+            className="text-center"
+          >
+            {/* ATH Badge */}
+            <motion.div
+              initial={{ scale: 0, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.5, type: 'spring' }}
+              className="inline-flex items-center gap-3 border-4 border-green-500 bg-black px-6 py-3 mb-8"
+            >
+              <TrendingUp className="w-10 h-10 text-green-500" />
+              <span className="text-4xl font-bold text-green-500 led-glow">ATH</span>
+              <TrendingUp className="w-10 h-10 text-green-500" />
+            </motion.div>
+
+            {/* Stock display - terminal style */}
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="border-2 border-green-500 bg-black p-6 max-w-lg mx-auto"
+            >
+              <div className="flex items-start gap-6">
+                {/* Stock image */}
+                <motion.div
+                  animate={{
+                    boxShadow: ['0 0 10px #22c55e', '0 0 30px #22c55e', '0 0 10px #22c55e']
+                  }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  className="relative w-28 h-28 border-2 border-green-500 overflow-hidden flex-shrink-0"
+                >
+                  {stock.image ? (
+                    <Image
+                      unoptimized
+                      src={stock.image}
+                      alt={stock.title}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-green-900/50 flex items-center justify-center text-2xl font-bold text-green-500">
+                      {stock.ticker.slice(0, 2)}
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Stock info */}
+                <div className="flex-1 text-left">
+                  <h2 className="text-2xl font-bold text-primary mb-1">{stock.title}</h2>
+                  <p className="text-xl text-accent font-bold mb-4">{stock.ticker}</p>
+
+                  {/* Price chart simulation */}
+                  <div className="flex items-end gap-1 h-8 mb-2">
+                    {[40, 50, 45, 60, 55, 70, 65, 80, 75, 90, 85, 100].map((h, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ height: 0 }}
+                        animate={{ height: `${h}%` }}
+                        transition={{ delay: 1 + i * 0.05 }}
+                        className="w-2 bg-green-500"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Price display */}
+              <div className="border-t border-green-500/50 mt-4 pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">NEUER REKORD:</span>
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 1.2, type: 'spring' }}
+                    className="text-4xl font-bold text-green-500 led-glow"
+                  >
+                    {stock.price.toFixed(2)} CHF
+                  </motion.span>
+                </div>
+
+                {/* Previous high comparison */}
+                {event.metadata?.previousPrice && (
+                  <div className="flex items-center justify-between mt-2 text-sm">
+                    <span className="text-muted-foreground">VORHERIGES HOCH:</span>
+                    <span className="text-muted-foreground line-through">
+                      {event.metadata.previousPrice.toFixed(2)} CHF
+                    </span>
+                  </div>
+                )}
+
+                {/* Change */}
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-muted-foreground">VERÄNDERUNG:</span>
+                  <span className="text-xl font-bold text-green-500">
+                    ▲ +{stock.percent_change.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Tap to dismiss */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              transition={{ delay: 3 }}
+              className="mt-6 text-sm text-muted-foreground"
+            >
+              ─── TIPPEN ZUM SCHLIESSEN ───
+            </motion.p>
+          </motion.div>
+        </div>
+
+        {/* Bottom status bar */}
+        <div className="bg-green-900/50 border-t border-green-700 py-2 px-4">
+          <div className="flex items-center justify-between text-sm text-green-400">
+            <span>┌─ SMG BÖRSE ─┐</span>
+            <span>LIVE │ ALLZEITHOCH ERREICHT</span>
+            <span>┌─ {new Date().toLocaleTimeString('de-DE')} ─┐</span>
+          </div>
+        </div>
       </motion.div>
     </AnimatePresence>
   );

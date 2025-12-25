@@ -14,6 +14,10 @@ export type EffectType =
   | 'aurora'
   | 'glitch'
   | 'beatSync'
+  | 'phosphor'
+  | 'flicker'
+  | 'noise'
+  | 'interlace'
 
 interface EffectsContextType {
   // Individual effects
@@ -34,6 +38,12 @@ interface EffectsContextType {
   // Settings panel
   settingsPanelOpen: boolean
   setSettingsPanelOpen: (open: boolean) => void
+
+  // Marquee toggles
+  stockMarqueeEnabled: boolean
+  setStockMarqueeEnabled: (enabled: boolean) => void
+  headlinesMarqueeEnabled: boolean
+  setHeadlinesMarqueeEnabled: (enabled: boolean) => void
 
   // Reset on error
   resetEffects: () => void
@@ -57,11 +67,17 @@ const DEFAULT_INTENSITIES: Record<EffectType, number> = {
   aurora: DEFAULT_INTENSITY,
   glitch: DEFAULT_INTENSITY,
   beatSync: DEFAULT_INTENSITY,
+  phosphor: DEFAULT_INTENSITY,
+  flicker: DEFAULT_INTENSITY,
+  noise: DEFAULT_INTENSITY,
+  interlace: DEFAULT_INTENSITY,
 }
 
 interface StoredSettings {
   enabledEffects: EffectType[]
   effectIntensities?: Partial<Record<EffectType, number>>
+  stockMarqueeEnabled?: boolean
+  headlinesMarqueeEnabled?: boolean
 }
 
 export function EffectsProvider({ children }: { children: React.ReactNode }) {
@@ -69,6 +85,8 @@ export function EffectsProvider({ children }: { children: React.ReactNode }) {
   const [effectIntensities, setEffectIntensities] = useState<Record<EffectType, number>>(DEFAULT_INTENSITIES)
   const [bootComplete, setBootComplete] = useState(false)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
+  const [stockMarqueeEnabled, setStockMarqueeEnabled] = useState(false)
+  const [headlinesMarqueeEnabled, setHeadlinesMarqueeEnabled] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
   // Load settings from localStorage on mount
@@ -80,6 +98,12 @@ export function EffectsProvider({ children }: { children: React.ReactNode }) {
         setEnabledEffects(new Set(settings.enabledEffects))
         if (settings.effectIntensities) {
           setEffectIntensities({ ...DEFAULT_INTENSITIES, ...settings.effectIntensities })
+        }
+        if (settings.stockMarqueeEnabled !== undefined) {
+          setStockMarqueeEnabled(settings.stockMarqueeEnabled)
+        }
+        if (settings.headlinesMarqueeEnabled !== undefined) {
+          setHeadlinesMarqueeEnabled(settings.headlinesMarqueeEnabled)
         }
       }
     } catch {
@@ -95,12 +119,14 @@ export function EffectsProvider({ children }: { children: React.ReactNode }) {
       const settings: StoredSettings = {
         enabledEffects: Array.from(enabledEffects),
         effectIntensities,
+        stockMarqueeEnabled,
+        headlinesMarqueeEnabled,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     } catch {
       // Ignore localStorage errors
     }
-  }, [enabledEffects, effectIntensities, hydrated])
+  }, [enabledEffects, effectIntensities, stockMarqueeEnabled, headlinesMarqueeEnabled, hydrated])
 
   // Keyboard shortcut: Ctrl/Cmd + Shift + E
   useEffect(() => {
@@ -170,6 +196,10 @@ export function EffectsProvider({ children }: { children: React.ReactNode }) {
         setBootComplete,
         settingsPanelOpen,
         setSettingsPanelOpen,
+        stockMarqueeEnabled,
+        setStockMarqueeEnabled,
+        headlinesMarqueeEnabled,
+        setHeadlinesMarqueeEnabled,
         resetEffects,
       }}
     >

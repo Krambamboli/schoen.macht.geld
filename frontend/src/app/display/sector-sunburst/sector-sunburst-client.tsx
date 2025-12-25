@@ -2,31 +2,32 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, PieChart } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateStockGroupsAiGenerateStockGroupsGet } from '@/lib/api/client';
 import type { StockGroup } from '@/lib/api/client';
 
+
 const REFRESH_INTERVAL_MS = 90000;
 
-// Color palette for sectors
+// Bloomberg terminal color palette for sectors
 const SECTOR_COLORS = [
-  '#A020F0', // Primary purple
-  '#20A0F0', // Accent blue
-  '#8B5CF6', // Violet
-  '#06B6D4', // Cyan
-  '#EC4899', // Pink
-  '#F59E0B', // Amber
+  '#ff9900', // Primary orange
+  '#ffcc00', // Gold/accent
+  '#22c55e', // Green
+  '#3b82f6', // Blue
+  '#f97316', // Orange variant
+  '#a855f7', // Purple
 ];
 
-// Lighter shades for stocks
+// Darker shades for stocks - terminal aesthetic
 const STOCK_COLORS = [
-  ['#C084FC', '#D8B4FE', '#E9D5FF', '#F3E8FF'],
-  ['#38BDF8', '#7DD3FC', '#BAE6FD', '#E0F2FE'],
-  ['#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE'],
-  ['#22D3EE', '#67E8F9', '#A5F3FC', '#CFFAFE'],
-  ['#F472B6', '#F9A8D4', '#FBCFE8', '#FCE7F3'],
-  ['#FBBF24', '#FCD34D', '#FDE68A', '#FEF3C7'],
+  ['#d97706', '#b45309', '#92400e', '#78350f'],
+  ['#ca8a04', '#a16207', '#854d0e', '#713f12'],
+  ['#16a34a', '#15803d', '#166534', '#14532d'],
+  ['#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a'],
+  ['#ea580c', '#c2410c', '#9a3412', '#7c2d12'],
+  ['#9333ea', '#7e22ce', '#6b21a8', '#581c87'],
 ];
 
 interface ArcData {
@@ -159,7 +160,7 @@ function CustomSunburst({
       {/* Center - drawn before labels so it doesn't cover them */}
       <circle cx={cx} cy={cy} r={innerRadius - gap} fill="#000" />
 
-      {/* Labels with boxes */}
+      {/* Labels with boxes - terminal style */}
       {arcs.map((arc, i) => {
         const midAngle = (arc.startAngle + arc.endAngle) / 2;
         const labelRadius = (arc.innerRadius + arc.outerRadius) / 2;
@@ -191,14 +192,15 @@ function CustomSunburst({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '4px',
+                backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                border: '1px solid #ff9900',
                 padding: '0 8px',
-                color: 'white',
+                color: '#ff9900',
                 fontSize: arc.isStock ? '11px' : '13px',
                 fontWeight: arc.isStock ? 'normal' : 'bold',
                 whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--font-body), monospace',
               }}
             >
               {arc.name}
@@ -210,9 +212,10 @@ function CustomSunburst({
         x={cx}
         y={cy - 8}
         textAnchor="middle"
-        fill="#A020F0"
+        fill="#ff9900"
         fontSize={24}
         fontWeight="bold"
+        style={{ textShadow: '0 0 10px #ff9900' }}
       >
         SMG
       </text>
@@ -220,10 +223,11 @@ function CustomSunburst({
         x={cx}
         y={cy + 14}
         textAnchor="middle"
-        fill="#666"
+        fill="#ffcc00"
         fontSize={12}
+        style={{ textTransform: 'uppercase' }}
       >
-        Börse
+        BÖRSE
       </text>
     </svg>
   );
@@ -302,85 +306,78 @@ export default function SectorSunburstClient() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-black text-white">
+      <div className="flex flex-col items-center justify-center h-full bg-black text-primary">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="text-6xl mb-4"
         >
-          <PieChart className="w-16 h-16 text-purple-500" />
+          ◐
         </motion.div>
-        <motion.p
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="mt-4 text-xl"
-        >
-          Praktikant sortiert Aktien...
-        </motion.p>
+        <span className="text-xl blink-cursor">PRAKTIKANT SORTIERT AKTIEN...</span>
       </div>
     );
   }
 
   if (error || groups.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-black text-white">
-        <PieChart className="w-16 h-16 text-gray-600 mb-4" />
-        <h2 className="text-xl font-bold mb-2">{error || 'Keine Sektoren verfügbar'}</h2>
-        <p className="text-gray-400 mb-4">Nicht genug Aktien für Gruppierung</p>
-        <button
-          onClick={() => fetchGroups()}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Erneut versuchen
-        </button>
+      <div className="flex flex-col items-center justify-center h-full bg-black text-primary">
+        <div className="border-2 border-primary p-8 text-center">
+          <div className="text-4xl mb-4">◌</div>
+          <h2 className="text-xl font-bold mb-2">{error || 'KEINE SEKTOREN VERFÜGBAR'}</h2>
+          <p className="text-muted-foreground mb-4">NICHT GENUG AKTIEN FÜR GRUPPIERUNG</p>
+          <button
+            onClick={() => fetchGroups()}
+            className="flex items-center gap-2 px-4 py-2 border border-primary bg-black text-primary hover:bg-primary/20"
+          >
+            <RefreshCw className="w-4 h-4" />
+            ERNEUT VERSUCHEN
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full bg-black text-white overflow-hidden">
-      {/* Header */}
-      <div className="absolute top-2 left-4 right-4 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          <PieChart className="w-5 h-5 text-purple-400" />
-          <h1 className="text-lg font-bold">Sektor Sunburst</h1>
-          <span className="text-gray-500 text-sm">
-            {stats.sectorCount} Sektoren · {stats.totalStocks} Aktien · {stats.totalValue.toFixed(2)} CHF
-          </span>
-        </div>
+    <div className="relative w-full h-full bg-black text-primary overflow-hidden">
+      {/* Controls bar */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between z-20 border-b border-border bg-black/90 px-4 py-1">
+        <span className="text-muted-foreground text-sm">
+          {stats.sectorCount} SEKTOREN │ {stats.totalStocks} AKTIEN │ {stats.totalValue.toFixed(2)} CHF
+        </span>
         <button
           onClick={() => fetchGroups(true)}
           disabled={isRefreshing}
           className={cn(
-            'flex items-center gap-2 px-3 py-1 rounded-lg text-sm bg-white/10 hover:bg-white/20',
+            'flex items-center gap-2 px-2 py-0.5 border border-primary text-sm bg-black hover:bg-primary/20',
             isRefreshing && 'opacity-50 cursor-not-allowed'
           )}
         >
-          <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
-          Neu
+          <RefreshCw className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin')} />
+          NEU
         </button>
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} className="absolute top-10 bottom-16 left-0 right-0 flex items-center justify-center">
+      <div ref={containerRef} className="absolute top-10 bottom-10 left-0 right-0 flex items-center justify-center">
         {chartSize > 100 && (
           <CustomSunburst groups={groups} width={chartSize} height={chartSize} />
         )}
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-2 left-4 right-4 z-20">
+      <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-border bg-black/90 px-4 py-1">
         <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center">
           {groups.map((group, index) => {
             const sectorTotal = group.stocks.reduce((sum, s) => sum + s.price, 0);
             return (
               <div key={group.name} className="flex items-center gap-2">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-3 h-3"
                   style={{ backgroundColor: SECTOR_COLORS[index % SECTOR_COLORS.length] }}
                 />
-                <span className="text-sm font-medium truncate max-w-[200px]">{group.name}</span>
-                <span className="text-sm text-gray-400 font-mono">{sectorTotal.toFixed(2)} CHF</span>
+                <span className="text-sm font-bold truncate max-w-[200px] uppercase">{group.name}</span>
+                <span className="text-sm text-muted-foreground">{sectorTotal.toFixed(2)} CHF</span>
               </div>
             );
           })}

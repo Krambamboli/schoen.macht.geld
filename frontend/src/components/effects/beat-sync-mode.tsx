@@ -254,7 +254,7 @@ export function BeatSyncMode() {
           background: radial-gradient(
             ellipse at center,
             transparent 40%,
-            rgba(100, 200, 255, var(--beat-vignette, 0.08)) 100%
+            rgba(255, 153, 0, var(--beat-vignette, 0.08)) 100%
           );
         }
 
@@ -268,25 +268,25 @@ export function BeatSyncMode() {
         }
       `}</style>
 
-      {/* BPM indicator widget - shows all statuses */}
+      {/* BPM indicator widget - shows all statuses - Bloomberg style */}
       {beatState.status !== 'idle' && (
         <div
-          className={`fixed bottom-20 right-4 z-[9989] px-3 py-2 rounded-lg bg-zinc-900/90 border transition-all duration-75 ${
+          className={`fixed bottom-20 right-4 z-[9989] px-3 py-2 bg-black border transition-all duration-75 ${
             beatState.status === 'synced' && pulse
-              ? 'border-green-500 scale-110'
+              ? 'border-accent scale-110'
               : beatState.status === 'error'
                 ? 'border-red-500'
                 : beatState.status === 'listening'
-                  ? 'border-yellow-500'
-                  : 'border-zinc-700'
+                  ? 'border-primary'
+                  : 'border-border'
           }`}
         >
-          <div className="text-xs text-zinc-400 uppercase tracking-wide">BPM</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">BPM</div>
 
           {beatState.status === 'requesting' && (
             <div className="flex items-center gap-2">
-              <div className="animate-spin h-5 w-5 border-2 border-zinc-600 border-t-white rounded-full" />
-              <span className="text-sm text-zinc-400">Mic...</span>
+              <div className="animate-spin h-5 w-5 border-2 border-border border-t-primary" />
+              <span className="text-sm text-muted-foreground">MIC...</span>
             </div>
           )}
 
@@ -295,7 +295,7 @@ export function BeatSyncMode() {
               {[...Array(4)].map((_, i) => (
                 <div
                   key={i}
-                  className="w-1.5 bg-yellow-500 rounded-full animate-pulse"
+                  className="w-1.5 bg-primary animate-pulse"
                   style={{
                     height: `${8 + (i % 2) * 8}px`,
                     animationDelay: `${i * 0.15}s`,
@@ -306,7 +306,7 @@ export function BeatSyncMode() {
           )}
 
           {beatState.status === 'synced' && (
-            <div className="text-3xl font-bold font-mono tabular-nums">
+            <div className="text-3xl font-bold font-mono tabular-nums text-accent led-glow">
               {beatState.bpm}
             </div>
           )}
@@ -314,9 +314,9 @@ export function BeatSyncMode() {
           {beatState.status === 'error' && (
             <button
               onClick={startListening}
-              className="text-sm text-red-400 hover:text-red-300 transition-colors"
+              className="text-sm text-red-500 hover:text-red-400 transition-colors uppercase"
             >
-              Retry
+              RETRY
             </button>
           )}
         </div>

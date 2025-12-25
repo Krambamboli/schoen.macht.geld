@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Trophy, Play, RotateCcw } from 'lucide-react';
 import { useRaceData, type RaceStock } from '@/hooks/use-stocks';
 
+
 // Extended stock info with current race value (actual price from chart)
 interface RaceStockWithValue extends RaceStock {
   raceValue: number; // Current price from chart data
@@ -181,60 +182,57 @@ export default function PerformanceRaceClient() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-white bg-black">
-        <div className="text-2xl animate-pulse">Lade Renndaten...</div>
+      <div className="flex items-center justify-center h-full text-primary bg-black">
+        <span className="text-2xl blink-cursor">LADE RENNDATEN</span>
       </div>
     );
   }
 
   if (stockCount === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-white bg-black">
-        <div className="text-2xl">Keine Aktien verfügbar</div>
+      <div className="flex items-center justify-center h-full text-primary bg-black">
+        <div className="border-2 border-primary p-8 text-center">
+          <div className="text-2xl">KEINE AKTIEN VERFÜGBAR</div>
+        </div>
       </div>
     );
   }
 
   if (raceData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-white bg-black">
-        <div className="text-2xl">Keine Kursdaten verfügbar</div>
+      <div className="flex items-center justify-center h-full text-primary bg-black">
+        <div className="border-2 border-primary p-8 text-center">
+          <div className="text-2xl">KEINE KURSDATEN VERFÜGBAR</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full p-6 flex flex-col bg-black text-white">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Trophy className="w-10 h-10 text-yellow-500" />
-          <h1 className="text-4xl font-bold">Performance Race</h1>
+    <div className="w-full h-full p-4 flex flex-col bg-black text-primary">
+      {/* Controls */}
+      <div className="flex items-center justify-between mb-2 border-b border-border pb-1">
+        <div className="flex items-center gap-3 text-muted-foreground text-sm">
+          <Trophy className="w-5 h-5 text-accent" />
+          <span>{currentTimestamp} │ FRAME {currentFrame + 1}/{totalFrames}</span>
         </div>
-        <div className="flex items-center gap-4">
-          {/* Progress indicator */}
-          <div className="text-gray-400 text-lg font-mono">
-            {currentTimestamp} ({currentFrame + 1}/{totalFrames})
-          </div>
-          {/* Play/Restart button */}
-          <button
-            onClick={handleTogglePlay}
-            className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors"
-            title={isComplete ? 'Neustart' : isPlaying ? 'Pause' : 'Abspielen'}
-          >
-            {isComplete ? (
-              <RotateCcw className="w-5 h-5" />
-            ) : (
-              <Play className={cn('w-5 h-5', isPlaying && 'text-green-400')} />
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handleTogglePlay}
+          className="p-1.5 border border-primary bg-black hover:bg-primary/20 transition-colors"
+          title={isComplete ? 'Neustart' : isPlaying ? 'Pause' : 'Abspielen'}
+        >
+          {isComplete ? (
+            <RotateCcw className="w-4 h-4" />
+          ) : (
+            <Play className={cn('w-4 h-4', isPlaying && 'text-green-500')} />
+          )}
+        </button>
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-zinc-800 rounded-full mb-4 overflow-hidden">
+      <div className="h-1 bg-border mb-2 overflow-hidden">
         <div
-          className="h-full bg-yellow-500"
+          className="h-full bg-accent"
           style={{ width: `${((progress + 1) / totalFrames) * 100}%` }}
         />
       </div>
@@ -242,34 +240,35 @@ export default function PerformanceRaceClient() {
       {/* Main content: Chart + Legend */}
       <div className="flex-1 flex gap-6 min-h-0">
         {/* Chart */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 border border-border p-2">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}
               margin={{ top: 20, right: 250, left: 0, bottom: 20 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+              <CartesianGrid strokeDasharray="1 1" stroke="rgba(255, 153, 0, 0.2)" />
               <XAxis
                 dataKey="timestamp"
-                tick={{ fill: 'white', fontSize: 12 }}
-                tickLine={{ stroke: 'white' }}
-                axisLine={{ stroke: 'rgba(255, 255, 255, 0.3)' }}
+                tick={{ fill: '#ff9900', fontSize: 12 }}
+                tickLine={{ stroke: '#ff9900' }}
+                axisLine={{ stroke: '#ff9900', strokeWidth: 2 }}
               />
               <YAxis
                 domain={['dataMin - 5', 'dataMax + 5']}
-                tick={{ fill: 'white', fontSize: 12 }}
-                tickLine={{ stroke: 'white' }}
-                axisLine={{ stroke: 'rgba(255, 255, 255, 0.3)' }}
-                tickFormatter={(value) => `${value.toFixed(0)} CHF`}
+                tick={{ fill: '#ff9900', fontSize: 12 }}
+                tickLine={{ stroke: '#ff9900' }}
+                axisLine={{ stroke: '#ff9900', strokeWidth: 2 }}
+                tickFormatter={(value) => `${value.toFixed(0)}`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                  border: '1px solid #444',
-                  borderRadius: '8px',
-                  color: 'white',
+                  backgroundColor: '#000',
+                  border: '2px solid #ff9900',
+                  borderRadius: '0',
+                  color: '#ff9900',
+                  fontFamily: 'var(--font-body), monospace',
                 }}
-                labelStyle={{ fontWeight: 'bold', marginBottom: '8px' }}
+                labelStyle={{ fontWeight: 'bold', marginBottom: '8px', color: '#ffcc00' }}
                 formatter={(value: number, name: string) => {
                   const stock = raceStocks.find((s) => s.ticker === name);
                   return [`${value.toFixed(2)} CHF`, stock?.title ?? name];
@@ -311,11 +310,12 @@ export default function PerformanceRaceClient() {
           </ResponsiveContainer>
         </div>
       </div>
+
     </div>
   );
 }
 
-// SVG-based stock card for positioning at line endpoints
+// SVG-based stock card for positioning at line endpoints - terminal style
 function RaceStockCard({
   cx,
   cy,
@@ -332,85 +332,90 @@ function RaceStockCard({
   const offsetX = 15;
   const offsetY = -cardHeight / 2;
 
-  // Position colors for medals
+  // Position colors for medals - terminal style
   const positionColors = {
-    1: { bg: '#eab308', text: '#000' }, // gold
+    1: { bg: '#ffcc00', text: '#000' }, // gold
     2: { bg: '#9ca3af', text: '#000' }, // silver
     3: { bg: '#b45309', text: '#fff' }, // bronze
   };
-  const posColor = positionColors[position as 1 | 2 | 3] || { bg: '#3f3f46', text: '#fff' };
+  const posColor = positionColors[position as 1 | 2 | 3] || { bg: '#ff9900', text: '#000' };
 
   return (
     <g transform={`translate(${cx + offsetX}, ${cy + offsetY})`}>
-      {/* Card background */}
+      {/* Card background - terminal style */}
       <rect
         x={0}
         y={0}
         width={cardWidth}
         height={cardHeight}
-        rx={8}
-        fill="#18181b"
-        stroke={stock.color}
-        strokeWidth={2}
+        fill="#000"
+        stroke="#ff9900"
+        strokeWidth={1}
       />
 
-      {/* Position badge */}
-      <circle
-        cx={25}
-        cy={cardHeight / 2}
-        r={14}
+      {/* Position badge - square terminal style */}
+      <rect
+        x={5}
+        y={cardHeight / 2 - 12}
+        width={28}
+        height={24}
         fill={posColor.bg}
       />
       <text
-        x={25}
+        x={19}
         y={cardHeight / 2 + 5}
         textAnchor="middle"
         fill={posColor.text}
         fontSize={14}
         fontWeight="bold"
+        fontFamily="var(--font-body), monospace"
       >
-        {position}
+        #{position}
       </text>
 
       {/* Stock title */}
       <text
-        x={50}
+        x={42}
         y={cardHeight / 2 - 5}
-        fill="white"
-        fontSize={13}
+        fill="#ff9900"
+        fontSize={12}
         fontWeight="600"
+        fontFamily="var(--font-body), monospace"
+        style={{ textTransform: 'uppercase' }}
       >
-        {stock.title.length > 14 ? stock.title.slice(0, 14) + '…' : stock.title}
+        {stock.title.length > 12 ? stock.title.slice(0, 12) + '…' : stock.title}
       </text>
 
       {/* Stock ticker */}
       <text
-        x={50}
+        x={42}
         y={cardHeight / 2 + 12}
-        fill="#9ca3af"
+        fill="#ffcc00"
         fontSize={11}
-        fontFamily="monospace"
+        fontFamily="var(--font-body), monospace"
       >
         {stock.ticker}
       </text>
 
-      {/* Price value */}
+      {/* Price value - terminal LED style */}
       <rect
         x={cardWidth - 75}
         y={cardHeight / 2 - 12}
         width={65}
         height={24}
-        rx={4}
-        fill={stock.color + '33'}
+        fill="#000"
+        stroke={stock.color}
+        strokeWidth={1}
       />
       <text
         x={cardWidth - 42}
-        y={cardHeight / 2 + 4}
+        y={cardHeight / 2 + 5}
         textAnchor="middle"
         fill={stock.color}
-        fontSize={12}
+        fontSize={13}
         fontWeight="bold"
-        fontFamily="monospace"
+        fontFamily="var(--font-body), monospace"
+        style={{ filter: `drop-shadow(0 0 3px ${stock.color})` }}
       >
         {stock.raceValue.toFixed(1)}
       </text>

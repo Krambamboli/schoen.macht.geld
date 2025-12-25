@@ -60,7 +60,7 @@ export function BinaryMode() {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = `rgba(0, 255, 100, ${colorOpacity})`;
+      ctx.fillStyle = `rgba(255, 153, 0, ${colorOpacity})`;
       ctx.font = `${fontSize}px monospace`;
 
       for (let i = 0; i < totalColumns; i++) {

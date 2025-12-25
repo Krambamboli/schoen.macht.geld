@@ -5,14 +5,14 @@ import { useEffects } from '@/contexts/effects-context'
 
 const CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789'
 
-// Pre-computed colors for performance
+// Pre-computed colors for performance - Bloomberg orange theme
 const COLORS = [
-  '#ffffff',
-  'rgba(0, 255, 65, 0.9)',
-  'rgba(0, 255, 65, 0.7)',
-  'rgba(0, 255, 65, 0.5)',
-  'rgba(0, 255, 65, 0.3)',
-  'rgba(0, 255, 65, 0.15)',
+  '#ffcc00',
+  'rgba(255, 153, 0, 0.9)',
+  'rgba(255, 153, 0, 0.7)',
+  'rgba(255, 153, 0, 0.5)',
+  'rgba(255, 153, 0, 0.3)',
+  'rgba(255, 153, 0, 0.15)',
 ]
 
 interface Column {
@@ -142,16 +142,8 @@ export function HackerMode() {
       />
       <div
         className="fixed inset-0 z-[3] pointer-events-none"
-        style={{ backgroundColor: `rgba(0, 255, 65, ${tintOpacity})` }}
+        style={{ backgroundColor: `rgba(255, 153, 0, ${tintOpacity})` }}
       />
-      <style jsx global>{`
-        body.hacker-mode {
-          font-family: 'Courier New', monospace !important;
-        }
-        body.hacker-mode *:not([data-radix-popper-content-wrapper] *):not([role="dialog"] *) {
-          font-family: inherit !important;
-        }
-      `}</style>
     </>
   )
 }

@@ -141,31 +141,40 @@ export default function SwipeClient() {
     return (
       <div className="text-center flex flex-col items-center gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
-        <h2 className="text-2xl font-bold">Lade Markt...</h2>
-        <p className="text-muted-foreground">Die neusten Profile werden für dich vorbereitet.</p>
+        <h2 className="text-2xl font-bold text-primary">LADE MARKT...</h2>
+        <p className="text-muted-foreground">PROFILE WERDEN VORBEREITET</p>
       </div>
     );
   }
 
   if (!currentStock) {
     return (
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Noch keine Aktien verfügbar!</h2>
-        <p className="text-muted-foreground">
-          Geh zur Admin-Seite, um die erste Aktie zu erstellen.
+      <div className="text-center border-2 border-primary p-8 bg-black">
+        <h2 className="text-2xl font-bold text-primary">KEINE AKTIEN VERFÜGBAR</h2>
+        <p className="text-muted-foreground mt-2">
+          ADMIN-SEITE AUFRUFEN UM ERSTE AKTIE ZU ERSTELLEN
         </p>
       </div>
     );
   }
 
   const imageUrl = currentStock.image || '/placeholder.png';
+  const isPositive = currentStock.percent_change >= 0;
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
+      {/* Header info bar */}
+      <div className="absolute top-16 left-0 right-0 z-10 px-4">
+        <div className="flex items-center justify-between text-sm text-muted-foreground border border-border bg-black/80 px-3 py-1">
+          <span>┌─ STOCK SWIPE ─┐</span>
+          <span>#{currentIndex + 1} / {stockQueue.length}</span>
+        </div>
+      </div>
+
       <div className="relative w-full h-full flex items-center justify-center">
         <motion.div
           key={currentStock.ticker}
-          className="absolute w-[90vw] h-[80vh] max-w-sm max-h-[600px]"
+          className="absolute w-[90vw] h-[75vh] max-w-sm max-h-[550px]"
           style={{ x, rotate, opacity, zIndex: 1 }}
           drag={isTouchDevice ? 'x' : false}
           dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
@@ -180,7 +189,8 @@ export default function SwipeClient() {
           }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="relative w-full h-full overflow-hidden shadow-2xl shadow-black/20">
+          <Card className="relative w-full h-full overflow-hidden border-2 border-primary bg-black">
+            {/* Image area */}
             <div className="absolute inset-0 w-full h-full">
               <Image
                 unoptimized
@@ -191,54 +201,88 @@ export default function SwipeClient() {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
             </div>
 
+            {/* Swipe indicators */}
             <>
               <motion.div
                 style={{ opacity: likeOpacity }}
-                className="absolute top-8 left-8 rotate-[-30deg] border-4 border-green-400 text-green-400 text-5xl font-bold p-4 rounded-xl"
+                className="absolute top-6 left-6 rotate-[-15deg] border-4 border-green-500 text-green-500 text-4xl font-bold px-4 py-2 bg-black/80"
               >
-                LIKE
+                ▲ BUY
               </motion.div>
               <motion.div
                 style={{ opacity: nopeOpacity }}
-                className="absolute top-8 right-8 rotate-[30deg] border-4 border-red-500 text-red-500 text-5xl font-bold p-4 rounded-xl"
+                className="absolute top-6 right-6 rotate-[15deg] border-4 border-red-500 text-red-500 text-4xl font-bold px-4 py-2 bg-black/80"
               >
-                NOPE
+                ▼ SELL
               </motion.div>
             </>
 
-            <CardContent className="absolute bottom-0 left-0 right-0 p-6 text-white">
-              <div className="flex items-baseline gap-4">
-                <h2 className="text-4xl font-bold font-headline">{currentStock.title}</h2>
-                <p className="text-2xl font-mono text-green-300">
-                  {currentStock.price.toFixed(2)} CHF
-                </p>
+            {/* Stock info panel */}
+            <CardContent className="absolute bottom-0 left-0 right-0 p-0 text-white">
+              {/* Ticker header */}
+              <div className="bg-primary text-primary-foreground px-4 py-2 flex items-center justify-between">
+                <span className="text-2xl font-bold">{currentStock.ticker}</span>
+                <span className={`text-xl font-bold ${isPositive ? 'text-green-900' : 'text-red-900'}`}>
+                  {isPositive ? '▲' : '▼'} {currentStock.percent_change >= 0 ? '+' : ''}{currentStock.percent_change.toFixed(1)}%
+                </span>
               </div>
-              <p className="mt-2 text-lg text-white/80">{currentStock.description}</p>
+
+              {/* Stock details */}
+              <div className="bg-black/90 p-4 border-t border-border">
+                <h2 className="text-2xl font-bold text-primary mb-1">{currentStock.title}</h2>
+
+                {/* Price display */}
+                <div className="flex items-baseline gap-2 mb-3">
+                  <span className={`text-3xl font-bold led-glow ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                    {currentStock.price.toFixed(2)}
+                  </span>
+                  <span className="text-lg text-muted-foreground">CHF</span>
+                </div>
+
+                {/* Description */}
+                <p className="text-sm text-muted-foreground line-clamp-2">{currentStock.description}</p>
+
+                {/* Rank info */}
+                {currentStock.rank && (
+                  <div className="mt-2 pt-2 border-t border-border text-sm">
+                    <span className="text-muted-foreground">RANG: </span>
+                    <span className="text-accent font-bold">#{currentStock.rank}</span>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      <div className="flex gap-8 mt-4 z-50 absolute bottom-10">
+      {/* Action buttons */}
+      <div className="flex gap-6 z-50 absolute bottom-8">
         <Button
           variant="outline"
-          className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border-red-500/50 text-red-500 hover:bg-red-500/20 hover:text-red-400"
+          className="w-20 h-20 border-4 border-red-500 bg-black text-red-500 hover:bg-red-500/20 hover:text-red-400 flex flex-col gap-1"
           onClick={() => handleSwipe('left')}
           disabled={isSubmitting}
         >
-          <X className="w-12 h-12" />
+          <X className="w-8 h-8" />
+          <span className="text-xs font-bold">SELL</span>
         </Button>
         <Button
           variant="outline"
-          className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border-green-400/50 text-green-400 hover:bg-green-400/20 hover:text-green-300"
+          className="w-20 h-20 border-4 border-green-500 bg-black text-green-500 hover:bg-green-500/20 hover:text-green-400 flex flex-col gap-1"
           onClick={() => handleSwipe('right')}
           disabled={isSubmitting}
         >
-          <Heart className="w-12 h-12" />
+          <Heart className="w-8 h-8" />
+          <span className="text-xs font-bold">BUY</span>
         </Button>
+      </div>
+
+      {/* Keyboard hint */}
+      <div className="absolute bottom-2 text-xs text-muted-foreground">
+        ← SELL │ BUY →
       </div>
     </div>
   );

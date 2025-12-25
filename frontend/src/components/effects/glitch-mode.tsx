@@ -64,15 +64,16 @@ export function GlitchMode() {
 
   return (
     <>
-      {/* Random glitch line */}
+      {/* Random glitch line - Bloomberg orange */}
       {glitchLine.visible && (
         <div
-          className="fixed left-0 right-0 pointer-events-none z-[91] bg-white/20"
+          className="fixed left-0 right-0 pointer-events-none z-[91]"
           style={{
             top: `${glitchLine.top}%`,
             height: `${glitchLine.height}px`,
             transform: `translateX(${(Math.random() - 0.5) * 20}px)`,
-            mixBlendMode: 'difference',
+            backgroundColor: 'rgba(255, 153, 0, 0.3)',
+            mixBlendMode: 'screen',
           }}
         />
       )}
@@ -124,21 +125,21 @@ export function GlitchMode() {
           }
           91% {
             text-shadow:
-              var(--glitch-rgb, 2px) 0 0 rgba(255, 0, 0, 0.7),
-              calc(-1 * var(--glitch-rgb, 2px)) 0 0 rgba(0, 255, 255, 0.7);
+              var(--glitch-rgb, 2px) 0 0 rgba(255, 153, 0, 0.7),
+              calc(-1 * var(--glitch-rgb, 2px)) 0 0 rgba(255, 204, 0, 0.7);
           }
           92% {
             text-shadow:
-              calc(-1 * var(--glitch-rgb, 2px)) 0 0 rgba(255, 0, 0, 0.7),
-              var(--glitch-rgb, 2px) 0 0 rgba(0, 255, 255, 0.7);
+              calc(-1 * var(--glitch-rgb, 2px)) 0 0 rgba(255, 153, 0, 0.7),
+              var(--glitch-rgb, 2px) 0 0 rgba(255, 204, 0, 0.7);
           }
           93% {
             text-shadow: none;
           }
           94% {
             text-shadow:
-              calc(0.5 * var(--glitch-rgb, 1px)) 0 0 rgba(255, 0, 0, 0.5),
-              calc(-0.5 * var(--glitch-rgb, 1px)) 0 0 rgba(0, 255, 255, 0.5);
+              calc(0.5 * var(--glitch-rgb, 1px)) 0 0 rgba(255, 153, 0, 0.5),
+              calc(-0.5 * var(--glitch-rgb, 1px)) 0 0 rgba(255, 204, 0, 0.5);
           }
         }
       `}</style>

@@ -19,9 +19,9 @@ const StockTicker = () => {
 
   if (isLoading && stocks.length === 0) {
     return (
-      <div className="w-full bg-gray-900 text-white h-full flex items-center justify-center">
-        <span className="text-2xl font-mono font-bold text-gray-400">
-          Warte auf Marktdaten...
+      <div className="w-full bg-black text-primary flex items-center justify-center py-8">
+        <span className="text-2xl font-bold uppercase tracking-wider led-glow">
+          ▌ WARTE AUF MARKTDATEN... ▐
         </span>
       </div>
     );
@@ -31,25 +31,35 @@ const StockTicker = () => {
   const animationDuration = (stocks?.length || 10) * 5;
 
   return (
-    <div className="w-full bg-gray-900 text-white h-full flex items-center overflow-hidden">
+    <div className="w-full bg-black text-primary flex items-center overflow-hidden">
       <div
         className="flex animate-marquee whitespace-nowrap"
         style={{ animationDuration: `${animationDuration}s` }}
       >
         {repeatedStocks.map((stock, index) => {
           const isPositive = stock.change >= 0;
+          const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
           return (
-            <div key={`${stock.ticker}-${index}`} className="flex items-center mx-6">
-              <span className="text-2xl font-mono font-bold text-gray-400">{stock.title}</span>
-              <span
-                className={`text-2xl font-mono font-bold ml-3 ${
-                  isPositive ? 'text-green-400' : 'text-red-400'
-                }`}
-              >
-                {stock.price.toFixed(2)} CHF
+            <div key={`${stock.ticker}-${index}`} className="flex items-center">
+              {/* Box-drawing separator */}
+              <span className="text-2xl text-muted-foreground mx-2">│</span>
+              {/* Stock ticker symbol */}
+              <span className="text-xl font-bold text-primary uppercase tracking-wide">
+                {stock.ticker}
               </span>
-              <span className={`ml-2 text-lg ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                {stock.change > 0 ? '▲' : stock.change < 0 ? '▼' : ''}
+              {/* Price with LED glow */}
+              <span className={`text-2xl font-bold ml-3 led-glow ${changeColor}`}>
+                {stock.price.toFixed(2)}
+              </span>
+              {/* Currency */}
+              <span className="text-lg text-muted-foreground ml-1">CHF</span>
+              {/* Change indicator */}
+              <span className={`ml-2 text-xl font-bold ${changeColor}`}>
+                {stock.change > 0 ? '▲' : stock.change < 0 ? '▼' : '─'}
+              </span>
+              {/* Percentage change */}
+              <span className={`ml-1 text-lg ${changeColor}`}>
+                {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent?.toFixed(1) || '0.0'}%
               </span>
             </div>
           );
@@ -67,6 +77,9 @@ const StockTicker = () => {
         .animate-marquee {
           animation: marquee linear infinite;
         }
+        .led-glow {
+          text-shadow: 0 0 2px currentColor, 0 0 4px currentColor, 0 0 8px currentColor;
+        }
       `}</style>
     </div>
   );
@@ -77,7 +90,7 @@ const StockTicker = () => {
  */
 export default function DisplayTickerPage() {
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full flex items-center bg-black">
       <StockTicker />
     </div>
   );

@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useStocks } from '@/hooks/use-stocks';
 import type { StockResponse } from '@/lib/api/client';
@@ -91,16 +91,19 @@ const NewsTicker = ({ stocks }: { stocks: StockResponse[] }) => {
   const animationDuration = Math.max(30, Math.ceil(tickerText.length / 10));
 
   return (
-    <div className="w-full bg-red-700 text-white h-10 flex items-center overflow-hidden">
+    <div className="w-full bg-red-900 text-white h-10 flex items-center overflow-hidden border-t border-red-700">
+      <div className="bg-red-800 text-white font-bold px-3 h-full flex items-center border-r border-red-700">
+        ▌NEWS▐
+      </div>
       <div
-        className="flex animate-marquee whitespace-nowrap"
+        className="flex animate-marquee whitespace-nowrap flex-1"
         style={{ animationDuration: `${animationDuration}s` }}
       >
-        <span className="text-xl font-bold px-12">
+        <span className="text-lg font-bold px-6">
           {tickerText}
           {HEADLINE_SEPARATOR}
         </span>
-        <span className="text-xl font-bold px-12" aria-hidden="true">
+        <span className="text-lg font-bold px-6" aria-hidden="true">
           {tickerText}
           {HEADLINE_SEPARATOR}
         </span>
@@ -208,82 +211,95 @@ export default function TerminalClient() {
 
   if (isLoading && stocks.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-black text-green-400 font-mono">
-        Lade Terminal...
+      <div className="h-full flex items-center justify-center bg-black text-primary">
+        <span className="blink-cursor">LADE TERMINAL</span>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col p-2 bg-black text-green-400 font-mono overflow-hidden">
-      <div className="flex justify-between items-center text-yellow-400 border-b-2 border-yellow-400 pb-1">
-        <h1 className="text-2xl">SMG TERMINAL</h1>
-        <button
-          onClick={() => setIsAutoScrolling(!isAutoScrolling)}
-          className={cn(
-            'text-xs px-2 py-1 rounded border',
-            isAutoScrolling
-              ? 'border-green-400 text-green-400'
-              : 'border-gray-600 text-gray-600'
-          )}
-        >
-          {isAutoScrolling ? 'AUTO ▼' : 'AUTO ○'}
-        </button>
+    <div className="h-full flex flex-col bg-black text-primary overflow-hidden">
+      {/* Terminal Controls */}
+      <div className="flex justify-end items-center px-3 py-1 border-b border-border bg-black">
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-muted-foreground">
+            {sortedStocks.length} TITEL
+          </span>
+          <button
+            onClick={() => setIsAutoScrolling(!isAutoScrolling)}
+            className={cn(
+              'text-xs px-2 py-0.5 border font-bold',
+              isAutoScrolling
+                ? 'border-primary text-primary bg-primary/10'
+                : 'border-muted-foreground text-muted-foreground'
+            )}
+          >
+            {isAutoScrolling ? '▶ AUTO' : '■ PAUSE'}
+          </button>
+        </div>
       </div>
+
+      {/* Stock Table */}
       <div
         ref={scrollContainerRef}
         onWheel={handleUserScroll}
         onTouchStart={handleUserScroll}
-        className="flex-1 overflow-y-auto mt-1 scrollbar-thin scrollbar-thumb-green-800 scrollbar-track-transparent"
+        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent"
       >
-        <Table>
+        <Table className="alternating-rows">
           <TableHeader>
-            <TableRow className="border-gray-700 hover:bg-gray-900">
-              <TableHead className="text-yellow-400 w-12 px-1 h-6 py-0"></TableHead>
-              <TableHead className="text-yellow-400 px-1 h-6 py-0">TICKER</TableHead>
-              <TableHead className="text-yellow-400 px-1 h-6 py-0">NAME</TableHead>
-              <TableHead className="text-yellow-400 text-right px-1 h-6 py-0">WERT</TableHead>
-              <TableHead className="text-yellow-400 text-right px-1 h-6 py-0">CHG</TableHead>
-              <TableHead className="text-yellow-400 text-right px-1 h-6 py-0">% CHG</TableHead>
+            <TableRow className="border-border">
+              <TableHead className="w-10 px-2 h-8"></TableHead>
+              <TableHead className="px-2 h-8">TICKER</TableHead>
+              <TableHead className="px-2 h-8">NAME</TableHead>
+              <TableHead className="text-right px-2 h-8">WERT</TableHead>
+              <TableHead className="text-right px-2 h-8">CHG</TableHead>
+              <TableHead className="text-right px-2 h-8">%</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedStocks.map((stock) => {
+            {sortedStocks.map((stock, index) => {
               const isPositive = stock.change >= 0;
 
               let RankIndicator;
               if (!stock.rank || !stock.previous_rank || stock.rank === stock.previous_rank) {
-                RankIndicator = <Minus className="w-4 h-4 text-gray-600" />;
+                RankIndicator = <span className="text-muted-foreground">─</span>;
               } else if (stock.rank < stock.previous_rank) {
-                RankIndicator = <ArrowUp className="w-4 h-4 text-green-400" />;
+                RankIndicator = <ArrowUp className="w-4 h-4 text-green-500" />;
               } else {
                 RankIndicator = <ArrowDown className="w-4 h-4 text-red-500" />;
               }
 
               return (
-                <TableRow key={stock.ticker} className="border-gray-800 hover:bg-gray-900/50">
-                  <TableCell className="w-12 px-1 py-0">{RankIndicator}</TableCell>
-                  <TableCell className="font-bold px-1 py-0">{stock.ticker}</TableCell>
-                  <TableCell className="px-1 py-0 truncate max-w-xs">{stock.title}</TableCell>
+                <TableRow
+                  key={stock.ticker}
+                  className={cn(
+                    "border-border/50 hover:bg-primary/10",
+                    index % 2 === 0 ? "bg-transparent" : "bg-primary/5"
+                  )}
+                >
+                  <TableCell className="w-10 px-2 py-1">{RankIndicator}</TableCell>
+                  <TableCell className="font-bold px-2 py-1 text-accent">{stock.ticker}</TableCell>
+                  <TableCell className="px-2 py-1 truncate max-w-xs text-foreground">{stock.title}</TableCell>
                   <TableCell
                     className={cn(
-                      'text-right font-bold px-1 py-0',
-                      isPositive ? 'text-green-400' : 'text-red-500'
+                      'text-right font-bold px-2 py-1',
+                      isPositive ? 'text-green-500' : 'text-red-500'
                     )}
                   >
                     <FlashValue
                       value={stock.price}
                       trackingKey={stock.ticker}
-                      formatFn={(v) => `${Number(v).toFixed(2)} CHF`}
+                      formatFn={(v) => `${Number(v).toFixed(2)}`}
                     />
                   </TableCell>
                   <TableCell
                     className={cn(
-                      'text-right px-1 py-0',
+                      'text-right px-2 py-1',
                       stock.change === 0
-                        ? 'text-gray-500'
+                        ? 'text-muted-foreground'
                         : isPositive
-                          ? 'text-green-400'
+                          ? 'text-green-500'
                           : 'text-red-500'
                     )}
                   >
@@ -295,18 +311,18 @@ export default function TerminalClient() {
                   </TableCell>
                   <TableCell
                     className={cn(
-                      'text-right px-1 py-0',
+                      'text-right px-2 py-1',
                       stock.percent_change === 0
-                        ? 'text-gray-500'
+                        ? 'text-muted-foreground'
                         : isPositive
-                          ? 'text-green-400'
+                          ? 'text-green-500'
                           : 'text-red-500'
                     )}
                   >
                     <FlashValue
                       value={stock.percent_change}
                       trackingKey={stock.ticker}
-                      formatFn={(v) => `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(2)}%`}
+                      formatFn={(v) => `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`}
                     />
                   </TableCell>
                 </TableRow>
@@ -315,6 +331,8 @@ export default function TerminalClient() {
           </TableBody>
         </Table>
       </div>
+
+      {/* News Ticker */}
       <div className="mt-auto">
         <NewsTicker stocks={stocks} />
       </div>

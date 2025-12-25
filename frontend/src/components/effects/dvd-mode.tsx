@@ -109,33 +109,33 @@ export function DvdMode() {
     <div className="fixed inset-0 pointer-events-none z-[85]">
       <div
         ref={logoRef}
-        className="absolute top-0 left-0 flex flex-col items-center justify-center px-6 py-3 rounded-xl"
+        className="absolute top-0 left-0 flex flex-col items-center justify-center px-6 py-3"
         style={{
           width: LOGO_WIDTH,
           height: LOGO_HEIGHT,
           opacity: logoOpacity,
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
-          border: `2px solid hsl(${hue}, 80%, 60%)`,
-          boxShadow: `0 0 ${glowIntensity}px hsla(${hue}, 100%, 50%, 0.5)`,
+          backgroundColor: 'rgba(0, 0, 0, 0.95)',
+          border: `2px solid hsl(${hue % 60 + 20}, 100%, 50%)`,
+          boxShadow: `0 0 ${glowIntensity}px hsla(${hue % 60 + 20}, 100%, 50%, 0.5)`,
         }}
       >
         <span
           className="font-bold text-4xl tracking-wider"
           style={{
-            color: 'white',
-            textShadow: `0 0 ${glowIntensity * 0.5}px hsl(${hue}, 100%, 70%), 0 0 ${glowIntensity}px hsl(${hue}, 100%, 50%)`,
+            color: '#ff9900',
+            textShadow: `0 0 ${glowIntensity * 0.5}px hsl(${hue % 60 + 20}, 100%, 70%), 0 0 ${glowIntensity}px hsl(${hue % 60 + 20}, 100%, 50%)`,
           }}
         >
-          VAK
+          SMG
         </span>
         <span
           className="text-xs tracking-widest uppercase opacity-80"
           style={{
-            color: 'white',
-            textShadow: `0 0 ${glowIntensity * 0.25}px hsl(${hue}, 100%, 70%)`,
+            color: '#ffcc00',
+            textShadow: `0 0 ${glowIntensity * 0.25}px hsl(${hue % 60 + 20}, 100%, 70%)`,
           }}
         >
-          Stock Exchange
+          BÖRSE
         </span>
       </div>
     </div>

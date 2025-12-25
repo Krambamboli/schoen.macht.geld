@@ -18,6 +18,14 @@ import { SettingsPanel } from './settings-panel'
 // Effects that need body classes for CSS styling
 const BODY_CLASS_EFFECTS: EffectType[] = ['hacker', 'drunk', 'redacted', 'crt', 'neon', 'glitch']
 
+// Retro CRT effect class mappings
+const RETRO_EFFECT_CLASSES: Record<string, string> = {
+  phosphor: 'phosphor-glow',
+  flicker: 'screen-flicker',
+  noise: 'noise-overlay',
+  interlace: 'interlace-overlay',
+}
+
 export function EffectsLayer() {
   const { isEffectEnabled } = useEffects()
 
@@ -28,6 +36,15 @@ export function EffectsLayer() {
     BODY_CLASS_EFFECTS.forEach((effect) => {
       const className = `effect-${effect}`
       if (isEffectEnabled(effect)) {
+        body.classList.add(className)
+      } else {
+        body.classList.remove(className)
+      }
+    })
+
+    // Retro CRT effects
+    Object.entries(RETRO_EFFECT_CLASSES).forEach(([effect, className]) => {
+      if (isEffectEnabled(effect as EffectType)) {
         body.classList.add(className)
       } else {
         body.classList.remove(className)
@@ -54,6 +71,9 @@ export function EffectsLayer() {
     return () => {
       BODY_CLASS_EFFECTS.forEach((effect) => {
         body.classList.remove(`effect-${effect}`)
+      })
+      Object.values(RETRO_EFFECT_CLASSES).forEach((className) => {
+        body.classList.remove(className)
       })
       body.classList.remove('hacker-mode', 'drunk-mode', 'redacted-mode')
     }

@@ -76,6 +76,29 @@ const VISUAL_MODES: EffectOption[] = [
   },
 ]
 
+const RETRO_CRT_EFFECTS: EffectOption[] = [
+  {
+    id: 'phosphor',
+    label: 'Phosphor Glow',
+    description: 'Subtle text glow like old CRT monitors',
+  },
+  {
+    id: 'flicker',
+    label: 'Screen Flicker',
+    description: 'Occasional brightness variation',
+  },
+  {
+    id: 'noise',
+    label: 'Noise Grain',
+    description: 'Analog static noise overlay',
+  },
+  {
+    id: 'interlace',
+    label: 'Interlacing',
+    description: 'Horizontal scanline pattern',
+  },
+]
+
 // Helper to get hotkey for an effect
 const getEffectHotkey = (effectId: EffectType): string | null => {
   const mapping = EFFECT_KEYS.find((ek) => ek.effect === effectId)
@@ -91,6 +114,10 @@ export function SettingsPanel() {
     setEffectIntensity,
     settingsPanelOpen,
     setSettingsPanelOpen,
+    stockMarqueeEnabled,
+    setStockMarqueeEnabled,
+    headlinesMarqueeEnabled,
+    setHeadlinesMarqueeEnabled,
   } = useEffects()
 
   const { eventsEnabled, setEventsEnabled } = useEvents()
@@ -110,7 +137,7 @@ export function SettingsPanel() {
                 {effect.label}
               </Label>
               {hotkey && (
-                <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">
+                <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-black text-primary border border-border">
                   {hotkey}
                 </kbd>
               )}
@@ -144,12 +171,12 @@ export function SettingsPanel() {
 
   return (
     <>
-      {/* Floating settings button - hidden when panel is open */}
+      {/* Floating settings button - hidden when panel is open - Bloomberg style */}
       {!settingsPanelOpen && (
         <button
           onClick={() => setSettingsPanelOpen(true)}
           data-effects-settings
-          className="fixed bottom-4 right-4 z-[9990] p-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white shadow-lg transition-all hover:scale-110"
+          className="fixed bottom-4 right-4 z-[9990] p-3 bg-black border border-primary text-primary hover:bg-primary/20 transition-all hover:scale-110"
           title="Visual Effects Settings (Ctrl+Shift+E)"
         >
           <Settings className="h-5 w-5" />
@@ -162,11 +189,50 @@ export function SettingsPanel() {
           <SheetHeader className="flex-shrink-0">
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
-              Toggle effects. Press <kbd className="px-1 py-0.5 text-[10px] font-mono bg-zinc-800 rounded">S</kbd> to open/close.
+              Toggle effects. Press <kbd className="px-1 py-0.5 text-[10px] font-mono bg-black text-primary border border-border">S</kbd> to open/close.
             </SheetDescription>
           </SheetHeader>
 
           <div className="mt-6 space-y-6 flex-1 overflow-y-auto pr-2">
+            {/* Marquee Tickers section */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Laufbänder
+              </h4>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="stockMarquee" className="text-base">
+                    Kurse-Laufband
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Aktienkurse oben anzeigen
+                  </p>
+                </div>
+                <Switch
+                  id="stockMarquee"
+                  checked={stockMarqueeEnabled}
+                  onCheckedChange={setStockMarqueeEnabled}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="headlinesMarquee" className="text-base">
+                    News-Laufband
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Schlagzeilen unten anzeigen
+                  </p>
+                </div>
+                <Switch
+                  id="headlinesMarquee"
+                  checked={headlinesMarqueeEnabled}
+                  onCheckedChange={setHeadlinesMarqueeEnabled}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Animations section */}
             <div className="space-y-4">
               <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -228,6 +294,16 @@ export function SettingsPanel() {
 
             <Separator />
 
+            {/* Retro CRT Effects */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Retro CRT Effects
+              </h4>
+              {RETRO_CRT_EFFECTS.map(renderEffectToggle)}
+            </div>
+
+            <Separator />
+
             {/* Keyboard Shortcuts */}
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -235,23 +311,23 @@ export function SettingsPanel() {
               </h4>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">F1-F8</kbd>
+                  <kbd className="px-1.5 py-0.5 font-mono bg-black text-primary border border-border">F1-F8</kbd>
                   <span className="text-muted-foreground">Views</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">1-0</kbd>
+                  <kbd className="px-1.5 py-0.5 font-mono bg-black text-primary border border-border">1-0</kbd>
                   <span className="text-muted-foreground">Effects</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">E</kbd>
+                  <kbd className="px-1.5 py-0.5 font-mono bg-black text-primary border border-border">E</kbd>
                   <span className="text-muted-foreground">Disable all</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">S</kbd>
+                  <kbd className="px-1.5 py-0.5 font-mono bg-black text-primary border border-border">S</kbd>
                   <span className="text-muted-foreground">Settings</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">?</kbd>
+                  <kbd className="px-1.5 py-0.5 font-mono bg-black text-primary border border-border">?</kbd>
                   <span className="text-muted-foreground">Help</span>
                 </div>
               </div>

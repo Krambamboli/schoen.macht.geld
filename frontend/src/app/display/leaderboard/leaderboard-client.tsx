@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useStocks } from '@/hooks/use-stocks';
 import { FlashValue } from '@/components/flash-value';
 
@@ -26,56 +26,66 @@ export default function LeaderboardClient() {
 
   if (isLoading && stocks.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-black text-white">
-        Lade Rangliste...
+      <div className="h-full flex items-center justify-center bg-black text-primary">
+        <span className="text-2xl blink-cursor">LADE RANGLISTE</span>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col p-4 bg-black text-gray-200 overflow-hidden">
-      <h1 className="text-3xl font-bold text-center mb-4 text-white">Rangliste</h1>
+    <div className="h-full flex flex-col p-3 bg-black text-foreground overflow-hidden">
+      <div className="flex items-center justify-end mb-2">
+        <span className="text-sm text-muted-foreground">{sortedStocks.length} TITEL</span>
+      </div>
       <div className="flex-1 overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 h-full">
-          {sortedStocks.map((stock) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1 h-full">
+          {sortedStocks.map((stock, index) => {
             const isPositive = stock.percent_change >= 0;
             const rankChange = stock.rank_change ?? 0;
+            const isTop3 = (stock.rank ?? 999) <= 3;
 
             return (
               <div
                 key={stock.ticker}
-                className="grid grid-cols-[50px_1fr_80px_90px] items-center gap-2 p-2 rounded-lg bg-gray-900/50 border border-gray-800 text-base"
+                className={cn(
+                  "grid grid-cols-[45px_1fr_70px_80px] items-center gap-1 px-2 py-1 border text-sm",
+                  isTop3 ? "border-accent bg-accent/10" : "border-border",
+                  index % 2 === 0 ? "bg-transparent" : "bg-primary/5"
+                )}
               >
                 {/* Rank position with change indicator */}
                 <div className="flex items-center gap-1">
-                  <span className="font-bold text-xl text-yellow-400 w-6 text-right">
+                  <span className={cn(
+                    "font-bold text-lg w-5 text-right",
+                    isTop3 ? "text-accent led-glow" : "text-primary"
+                  )}>
                     <FlashValue
                       value={stock.rank ?? '-'}
                       trackingKey={stock.ticker}
                     />
                   </span>
                   {rankChange > 0 && (
-                    <ArrowUp size={14} className="text-green-400" />
+                    <ArrowUp size={12} className="text-green-500" />
                   )}
                   {rankChange < 0 && (
-                    <ArrowDown size={14} className="text-red-500" />
+                    <ArrowDown size={12} className="text-red-500" />
                   )}
                   {rankChange === 0 && stock.rank != null && (
-                    <Minus size={14} className="text-gray-500" />
+                    <span className="text-muted-foreground text-xs">─</span>
                   )}
                 </div>
 
                 {/* Stock info */}
                 <div className="flex flex-col overflow-hidden">
-                  <span className="font-bold text-white truncate">{stock.title}</span>
-                  <span className="text-xs font-mono text-gray-400">{stock.ticker}</span>
+                  <span className="font-bold text-foreground truncate text-sm">{stock.title}</span>
+                  <span className="text-xs text-accent">{stock.ticker}</span>
                 </div>
 
                 {/* Price */}
                 <span
                   className={cn(
-                    'font-mono font-bold text-right',
-                    isPositive ? 'text-green-400' : 'text-red-500'
+                    'font-bold text-right',
+                    isPositive ? 'text-green-500' : 'text-red-500'
                   )}
                 >
                   <FlashValue
@@ -89,16 +99,16 @@ export default function LeaderboardClient() {
                 <div
                   className={cn(
                     'flex items-center justify-end gap-1 font-bold',
-                    isPositive ? 'text-green-400' : 'text-red-500'
+                    isPositive ? 'text-green-500' : 'text-red-500'
                   )}
                 >
                   {stock.percent_change !== 0 && (
-                    isPositive ? <ArrowUp size={16} /> : <ArrowDown size={16} />
+                    isPositive ? <span>▲</span> : <span>▼</span>
                   )}
                   <FlashValue
                     value={stock.percent_change}
                     trackingKey={stock.ticker}
-                    formatFn={(v) => `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(2)}%`}
+                    formatFn={(v) => `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`}
                   />
                 </div>
               </div>
