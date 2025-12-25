@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -194,7 +195,7 @@ export default function SwipeClient() {
             <div className="absolute inset-0 w-full h-full">
               <Image
                 unoptimized
-                src={imageUrl}
+                src={currentStock.image || ''}
                 alt={currentStock.title}
                 data-ai-hint="person portrait"
                 fill
