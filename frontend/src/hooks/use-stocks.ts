@@ -1,3 +1,4 @@
+import { useEffect, useCallback } from 'react';
 import useSWR from 'swr';
 import {
   listStocksStocksGet,
@@ -9,6 +10,40 @@ import type { StockOrder, StockResponse, StockSnapshotResponse, SwipeDirection }
 
 // Fallback data for resilience
 const FALLBACK_STOCKS: StockResponse[] = [];
+
+// Sync interval in milliseconds - all clients refresh at the same wall clock times
+const SYNC_INTERVAL_MS = 5000;
+
+/**
+ * Calculate milliseconds until the next synchronized refresh time.
+ * All clients will refresh at the same wall clock moments.
+ */
+function getMsUntilNextSync(intervalMs: number): number {
+  const now = Date.now();
+  const msIntoInterval = now % intervalMs;
+  return intervalMs - msIntoInterval;
+}
+
+/**
+ * Hook that calls a revalidation callback at synchronized wall clock times.
+ */
+function useSyncedRevalidation(revalidate: () => void, intervalMs: number = SYNC_INTERVAL_MS): void {
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNext = () => {
+      const msUntilNext = getMsUntilNextSync(intervalMs);
+      timeoutId = setTimeout(() => {
+        revalidate();
+        scheduleNext();
+      }, msUntilNext);
+    };
+
+    scheduleNext();
+
+    return () => clearTimeout(timeoutId);
+  }, [revalidate, intervalMs]);
+}
 
 export interface UseStocksOptions {
   limit?: number;
@@ -26,11 +61,14 @@ export function useStocks(options?: UseStocksOptions) {
     },
     {
       fallbackData: FALLBACK_STOCKS,
-      refreshInterval: 2000,
       revalidateOnFocus: false,
       dedupingInterval: 1000,
     }
   );
+
+  // Sync revalidation to wall clock
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate);
 
   return {
     stocks: data ?? FALLBACK_STOCKS,
@@ -43,7 +81,7 @@ export function useStocks(options?: UseStocksOptions) {
 
 export function useStock(ticker: string | null) {
   const { data, error, isLoading, mutate } = useSWR(
-    ticker ? `stock-${ticker}` : null,
+    ticker ? ['stock', ticker] : null,
     async () => {
       if (!ticker) return null;
       const response = await getStockStocksTickerGet({
@@ -52,10 +90,13 @@ export function useStock(ticker: string | null) {
       return response.data;
     },
     {
-      refreshInterval: 2000,
       revalidateOnFocus: false,
     }
   );
+
+  // Sync revalidation to wall clock
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate);
 
   return {
     stock: data,
@@ -68,7 +109,7 @@ export function useStock(ticker: string | null) {
 
 export function useStockSnapshots(ticker: string | null, limit = 100) {
   const { data, error, isLoading, mutate } = useSWR<StockSnapshotResponse[] | undefined>(
-    ticker ? `snapshots-${ticker}-${limit}` : null,
+    ticker ? ['snapshots', ticker, limit] : null,
     async () => {
       if (!ticker) return undefined;
       const response = await getStockSnapshotsStocksTickerSnapshotsGet({
@@ -78,10 +119,13 @@ export function useStockSnapshots(ticker: string | null, limit = 100) {
       return response.data;
     },
     {
-      refreshInterval: 5000,
       revalidateOnFocus: false,
     }
   );
+
+  // Sync revalidation to wall clock
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate);
 
   return {
     snapshots: data ?? [],
@@ -115,10 +159,13 @@ const RACE_COLORS = [
   '#8b5cf6', // violet
 ];
 
+// Slower sync interval for race data (10 seconds)
+const RACE_SYNC_INTERVAL_MS = 10000;
+
 export function useRaceData(count = 5, snapshotLimit = 30) {
   const { stocks } = useStocks({ order: 'rank', limit: count });
 
-  const { data, error, isLoading } = useSWR(
+  const { data, error, isLoading, mutate } = useSWR(
     stocks.length > 0 ? ['race-data', stocks.map((s) => s.ticker).join(','), snapshotLimit] : null,
     async () => {
       // Fetch snapshots for all stocks in parallel
@@ -187,10 +234,13 @@ export function useRaceData(count = 5, snapshotLimit = 30) {
       return { raceStocks, raceData };
     },
     {
-      refreshInterval: 10000, // Slower refresh: 10 seconds
       revalidateOnFocus: false,
     }
   );
+
+  // Sync revalidation to wall clock (slower for race data)
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate, RACE_SYNC_INTERVAL_MS);
 
   return {
     raceStocks: data?.raceStocks ?? [],

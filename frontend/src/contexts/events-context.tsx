@@ -1,10 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useStocks } from '@/hooks/use-stocks';
+import { useStocks, useStockSnapshots } from '@/hooks/use-stocks';
 import type { StockResponse } from '@/lib/api/client';
 
-export type EventType = 'new_leader' | 'all_time_high' | 'big_crash';
+export type EventType = 'new_leader' | 'all_time_high' | 'big_crash' | 'market_open';
 
 export interface StockEvent {
   id: string;
@@ -48,9 +48,15 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const previousStocksRef = useRef<Map<string, StockResponse>>(new Map());
   const previousLeaderRef = useRef<string | null>(null);
   const highestPricesRef = useRef<Map<string, number>>(new Map());
+  const lastSeenSnapshotRef = useRef<string | null>(null);
+  const marketOpenTriggeredForDateRef = useRef<string | null>(null);
 
   // Fetch stocks to monitor for events
   const { stocks } = useStocks({ order: 'rank', limit: 20 });
+
+  // Fetch snapshots to detect market open (use first stock as reference)
+  const firstTicker = stocks.length > 0 ? stocks[0].ticker : null;
+  const { snapshots } = useStockSnapshots(firstTicker, 1);
 
   // Load settings
   useEffect(() => {
@@ -110,6 +116,33 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       setEventQueue(rest);
     }
   }, [currentEvent, eventQueue]);
+
+  // Monitor snapshots for market open (new trading day)
+  useEffect(() => {
+    if (!eventsEnabled || snapshots.length === 0 || stocks.length === 0) return;
+
+    const latestSnapshot = snapshots[0];
+    const snapshotTimestamp = latestSnapshot.created_at;
+
+    // Get date string from snapshot (YYYY-MM-DD)
+    const snapshotDate = new Date(snapshotTimestamp).toISOString().split('T')[0];
+
+    // Check if this is a new snapshot we haven't seen before
+    if (lastSeenSnapshotRef.current !== null && snapshotTimestamp !== lastSeenSnapshotRef.current) {
+      // Check if we haven't triggered market open for this date yet
+      if (marketOpenTriggeredForDateRef.current !== snapshotDate) {
+        // New snapshot on a new date = market open
+        const leader = stocks.find((s) => s.rank === 1) ?? stocks[0];
+        queueEvent({
+          type: 'market_open',
+          stock: leader,
+        });
+        marketOpenTriggeredForDateRef.current = snapshotDate;
+      }
+    }
+
+    lastSeenSnapshotRef.current = snapshotTimestamp;
+  }, [snapshots, stocks, eventsEnabled, queueEvent]);
 
   // Monitor stocks for events
   useEffect(() => {
