@@ -19,6 +19,7 @@ from app.database import async_session_maker, get_query_stats, reset_query_stats
 from app.models.ai_task import AITask, TaskStatus, TaskType
 from app.models.stock import ChangeType, PriceEvent, Stock, StockSnapshot
 from app.services.ai import AIError, ai
+from app.websocket import manager as ws_manager
 
 scheduler = AsyncIOScheduler()
 
@@ -100,6 +101,9 @@ async def tick_prices() -> None:
         await session.commit()
         logger.debug("Ticked prices for {} stocks", len(stocks))
 
+        # Broadcast updated stocks via WebSocket
+        await ws_manager.broadcast_stocks_update(list(stocks))
+
 
 @timed_task
 async def snapshot_prices() -> None:
@@ -116,6 +120,9 @@ async def snapshot_prices() -> None:
         if not stocks:
             logger.debug("No active stocks to snapshot")
             return
+
+        # Capture previous state for event detection
+        previous_stocks = {s.ticker: Stock.model_validate(s) for s in stocks}
 
         now = datetime.now(UTC)
 
@@ -137,6 +144,12 @@ async def snapshot_prices() -> None:
 
         await session.commit()
         logger.debug("Created snapshots for {} stocks", len(stocks))
+
+        # Broadcast updated stocks via WebSocket
+        await ws_manager.broadcast_stocks_update(stocks)
+
+        # Detect and broadcast market events
+        await ws_manager.detect_and_broadcast_events(stocks, previous_stocks)
 
         # Cleanup old snapshots
         await _cleanup_old_snapshots(session)

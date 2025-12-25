@@ -1,7 +1,17 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from loguru import logger
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -23,8 +33,27 @@ from app.schemas.stock import (
     StockSnapshotResponse,
 )
 from app.storage import cleanup_old_image, process_image, validate_image
+from app.websocket import manager as ws_manager
 
 router = APIRouter()
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time stock updates.
+
+    Clients receive:
+    - stocks_update: Full list of stocks after price tick/snapshot
+    - stock_update: Single stock update after swipe
+    - event: Market events (new_leader, all_time_high, big_crash)
+    """
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive, wait for client messages (ping/pong)
+            _ = await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
 
 
 @router.get("/")
@@ -245,7 +274,7 @@ async def get_stock_snapshots(
     result = await session.exec(
         select(StockSnapshot)
         .where(StockSnapshot.ticker == ticker)
-        .order_by(col(StockSnapshot.created_at).desc())
+        .order_by(col(StockSnapshot.created_at).asc())
         .limit(limit)
     )
     snapshots = result.all()

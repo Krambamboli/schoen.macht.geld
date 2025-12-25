@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useWebSocket } from '@/contexts/websocket-context';
 import { useStocks, useStockSnapshots } from '@/hooks/use-stocks';
 import type { StockResponse } from '@/lib/api/client';
 
@@ -13,9 +14,12 @@ export interface StockEvent {
   timestamp: number;
   metadata?: {
     previousLeader?: StockResponse;
+    previousLeaderTicker?: string;
     crashPercent?: number;
     previousPrice?: number;
     newPrice?: number;
+    previousHigh?: number;
+    newHigh?: number;
   };
 }
 
@@ -36,7 +40,6 @@ interface EventsContextType {
 const EventsContext = createContext<EventsContextType | null>(null);
 
 const STORAGE_KEY = 'smg-events-settings';
-const CRASH_THRESHOLD = -10; // Trigger crash animation at -10% or worse
 
 export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [currentEvent, setCurrentEvent] = useState<StockEvent | null>(null);
@@ -44,14 +47,14 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [eventsEnabled, setEventsEnabled] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
-  // Track previous state for comparison
-  const previousStocksRef = useRef<Map<string, StockResponse>>(new Map());
-  const previousLeaderRef = useRef<string | null>(null);
-  const highestPricesRef = useRef<Map<string, number>>(new Map());
+  // WebSocket for receiving server-side events
+  const { lastEvent } = useWebSocket();
+
+  // Track state for market_open detection (still client-side for now)
   const lastSeenSnapshotRef = useRef<string | null>(null);
   const marketOpenTriggeredForDateRef = useRef<string | null>(null);
 
-  // Fetch stocks to monitor for events
+  // Fetch stocks for market_open detection
   const { stocks } = useStocks({ order: 'rank', limit: 20 });
 
   // Fetch snapshots to detect market open (use first stock as reference)
@@ -117,7 +120,26 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentEvent, eventQueue]);
 
-  // Monitor snapshots for market open (new trading day)
+  // Listen for WebSocket events (new_leader, all_time_high, big_crash)
+  useEffect(() => {
+    if (!eventsEnabled || !lastEvent) return;
+
+    const wsEvent = lastEvent;
+    if (wsEvent.event_type === 'new_leader' || wsEvent.event_type === 'all_time_high' || wsEvent.event_type === 'big_crash') {
+      queueEvent({
+        type: wsEvent.event_type as EventType,
+        stock: wsEvent.stock,
+        metadata: {
+          previousLeaderTicker: wsEvent.metadata?.previous_leader_ticker as string | undefined,
+          crashPercent: wsEvent.metadata?.crash_percent as number | undefined,
+          previousHigh: wsEvent.metadata?.previous_high as number | undefined,
+          newHigh: wsEvent.metadata?.new_high as number | undefined,
+        },
+      });
+    }
+  }, [lastEvent, eventsEnabled, queueEvent]);
+
+  // Monitor snapshots for market open (new trading day) - still client-side
   useEffect(() => {
     if (!eventsEnabled || snapshots.length === 0 || stocks.length === 0) return;
 
@@ -143,69 +165,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
     lastSeenSnapshotRef.current = snapshotTimestamp;
   }, [snapshots, stocks, eventsEnabled, queueEvent]);
-
-  // Monitor stocks for events
-  useEffect(() => {
-    if (!eventsEnabled || stocks.length === 0) return;
-
-    const currentStocksMap = new Map(stocks.map((s) => [s.ticker, s]));
-
-    // Check for new leader (rank #1 changed)
-    const currentLeader = stocks.find((s) => s.rank === 1);
-    if (currentLeader && previousLeaderRef.current !== null) {
-      if (currentLeader.ticker !== previousLeaderRef.current) {
-        const previousLeaderStock = previousStocksRef.current.get(previousLeaderRef.current);
-        queueEvent({
-          type: 'new_leader',
-          stock: currentLeader,
-          metadata: {
-            previousLeader: previousLeaderStock,
-          },
-        });
-      }
-    }
-    if (currentLeader) {
-      previousLeaderRef.current = currentLeader.ticker;
-    }
-
-    // Check each stock for events
-    stocks.forEach((stock) => {
-      const prevStock = previousStocksRef.current.get(stock.ticker);
-      const prevHighest = highestPricesRef.current.get(stock.ticker) ?? 0;
-
-      // All-time high detection
-      if (stock.price > prevHighest && prevHighest > 0) {
-        queueEvent({
-          type: 'all_time_high',
-          stock,
-          metadata: {
-            previousPrice: prevHighest,
-            newPrice: stock.price,
-          },
-        });
-      }
-      highestPricesRef.current.set(stock.ticker, Math.max(stock.price, prevHighest));
-
-      // Big crash detection (significant drop since last check)
-      if (prevStock && stock.percent_change <= CRASH_THRESHOLD) {
-        // Only trigger if this is a new crash (wasn't already below threshold)
-        if (prevStock.percent_change > CRASH_THRESHOLD) {
-          queueEvent({
-            type: 'big_crash',
-            stock,
-            metadata: {
-              crashPercent: stock.percent_change,
-              previousPrice: prevStock.price,
-              newPrice: stock.price,
-            },
-          });
-        }
-      }
-    });
-
-    // Update previous state
-    previousStocksRef.current = currentStocksMap;
-  }, [stocks, eventsEnabled, queueEvent]);
 
   return (
     <EventsContext.Provider

@@ -9,6 +9,7 @@ from app.database import get_session
 from app.models.stock import ChangeType, PriceEvent, Stock
 from app.schemas.stock import SwipeDirection, SwipeResponse
 from app.swipe_token import SwipeToken, calculate_price_delta
+from app.websocket import manager as ws_manager
 
 router = APIRouter()
 
@@ -80,6 +81,7 @@ async def swipe(
         session.add(price_event)
 
         await session.commit()
+        await session.refresh(stock)
 
         logger.debug(
             "{} {} -> {:.2f} (delta: {:.2f}, streak: {}, pickiness: {:.2f})",
@@ -90,6 +92,9 @@ async def swipe(
             stats.streak_length,
             stats.pickiness_ratio,
         )
+
+        # Broadcast stock update via WebSocket
+        await ws_manager.broadcast_stock_update(stock)
 
         return SwipeResponse(
             ticker=ticker,

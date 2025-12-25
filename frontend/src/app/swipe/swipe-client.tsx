@@ -1,44 +1,73 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, X, Loader2 } from 'lucide-react';
 import { useStocks, submitSwipe } from '@/hooks/use-stocks';
-import type { SwipeDirection } from '@/lib/api/client';
+import type { SwipeDirection, StockResponse } from '@/lib/api/client';
+
+// Minimum stocks remaining before fetching more
+const LOW_STOCK_THRESHOLD = 3;
 
 /**
  * The main client component for the Swipe Kiosk.
  * This component is the engine of the market, allowing users to influence stock values.
  * It fetches stocks from the API, displays them as swipeable cards, and on swipe,
  * calls the backend to update the stock's value.
+ *
+ * Optimized to maintain a local queue of stocks and only fetch more when running low.
+ * Price updates come via WebSocket, so no need to refetch after each swipe.
  */
 export default function SwipeClient() {
-  const { stocks, isLoading, mutate } = useStocks({ order: 'random' });
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const { stocks, isLoading } = useStocks({ order: 'random' });
   const [isTouchDevice, setIsTouchDevice] = useState(true);
   const [swipeToken, setSwipeToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // State to hold a stable, shuffled ORDER of stock tickers
-  const [shuffledTickers, setShuffledTickers] = useState<string[]>([]);
+  // Queue of stocks to swipe through (shuffled once, cycles infinitely)
+  const [stockQueue, setStockQueue] = useState<StockResponse[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Map stocks by ticker for efficient lookup
-  const stocksByTicker = useMemo(() => {
-    return new Map(stocks.map((stock) => [stock.ticker, stock]));
+  // Track if initial load has happened
+  const initialLoadDoneRef = useRef(false);
+
+  // Initialize queue with first batch of stocks (shuffled)
+  useEffect(() => {
+    if (stocks.length > 0 && !initialLoadDoneRef.current) {
+      const shuffled = [...stocks].sort(() => Math.random() - 0.5);
+      setStockQueue(shuffled);
+      initialLoadDoneRef.current = true;
+    }
   }, [stocks]);
 
-  // Effect to populate and shuffle the stock tickers only when stocks are added or removed
+  // Update stock data in queue when WebSocket pushes updates (prices change)
+  // Also add any new stocks that weren't in the initial load
   useEffect(() => {
-    if (stocks && stocks.length > 0) {
-      const currentTickers = new Set(shuffledTickers);
-      const newTickers = new Set(stocks.map((s) => s.ticker));
-      if (currentTickers.size !== newTickers.size || ![...newTickers].every((t) => currentTickers.has(t))) {
-        setShuffledTickers([...stocks].map((s) => s.ticker).sort(() => Math.random() - 0.5));
+    if (stocks.length === 0 || !initialLoadDoneRef.current) return;
+
+    const stocksMap = new Map(stocks.map((s) => [s.ticker, s]));
+
+    setStockQueue((prev) => {
+      const queueTickers = new Set(prev.map((s) => s.ticker));
+
+      // Update existing stocks with fresh data
+      const updated = prev.map((queuedStock) => {
+        const freshData = stocksMap.get(queuedStock.ticker);
+        return freshData || queuedStock;
+      });
+
+      // Find and append any new stocks (shuffled)
+      const newStocks = stocks.filter((s) => !queueTickers.has(s.ticker));
+      if (newStocks.length > 0) {
+        const shuffledNew = [...newStocks].sort(() => Math.random() - 0.5);
+        return [...updated, ...shuffledNew];
       }
-    }
+
+      return updated;
+    });
   }, [stocks]);
 
   // Detect if the device has touch capabilities
@@ -53,15 +82,18 @@ export default function SwipeClient() {
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
+  // Get current stock from queue (cycles through infinitely)
+  const currentStock = stockQueue.length > 0
+    ? stockQueue[currentIndex % stockQueue.length]
+    : null;
+
   /**
    * Handles the swipe action, either from a drag gesture or a button click.
    * It animates the card off-screen and then calls the backend to update the stock.
+   * No refetch needed - WebSocket pushes price updates.
    */
   const handleSwipe = useCallback(async (direction: SwipeDirection) => {
-    if (shuffledTickers.length === 0 || isSubmitting) return;
-
-    const tickerToUpdate = shuffledTickers[currentIndex % shuffledTickers.length];
-    if (!tickerToUpdate) return;
+    if (!currentStock || isSubmitting) return;
 
     setIsSubmitting(true);
 
@@ -73,12 +105,11 @@ export default function SwipeClient() {
         x.set(0);
 
         try {
-          const result = await submitSwipe(tickerToUpdate, direction, swipeToken);
+          const result = await submitSwipe(currentStock.ticker, direction, swipeToken);
           if (result) {
             setSwipeToken(result.token);
           }
-          // Trigger refetch of stocks
-          mutate();
+          // No mutate() needed - WebSocket will push the price update
         } catch (error) {
           console.error('Swipe failed:', error);
         } finally {
@@ -86,7 +117,7 @@ export default function SwipeClient() {
         }
       },
     });
-  }, [shuffledTickers, currentIndex, isSubmitting, swipeToken, x, mutate]);
+  }, [currentStock, isSubmitting, swipeToken, x]);
 
   // Handle arrow key presses for swiping
   useEffect(() => {
@@ -106,14 +137,7 @@ export default function SwipeClient() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSubmitting, handleSwipe]);
 
-  // Get the current stock from the stable shuffled list
-  const currentStock = useMemo(() => {
-    if (shuffledTickers.length === 0 || stocksByTicker.size === 0) return null;
-    const currentTicker = shuffledTickers[currentIndex % shuffledTickers.length];
-    return stocksByTicker.get(currentTicker) || null;
-  }, [shuffledTickers, currentIndex, stocksByTicker]);
-
-  if (isLoading && shuffledTickers.length === 0) {
+  if (isLoading && stockQueue.length === 0) {
     return (
       <div className="text-center flex flex-col items-center gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />

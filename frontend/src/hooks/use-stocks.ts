@@ -11,8 +11,9 @@ import type { StockOrder, StockResponse, StockSnapshotResponse, SwipeDirection }
 // Fallback data for resilience
 const FALLBACK_STOCKS: StockResponse[] = [];
 
-// Sync interval in milliseconds - all clients refresh at the same wall clock times
-const SYNC_INTERVAL_MS = 5000;
+// Sync interval in milliseconds - used as fallback when WebSocket is unavailable
+// With WebSocket push, this is just a safety net for missed updates
+const SYNC_INTERVAL_MS = 60000;
 
 /**
  * Calculate milliseconds until the next synchronized refresh time.
@@ -159,8 +160,8 @@ const RACE_COLORS = [
   '#8b5cf6', // violet
 ];
 
-// Slower sync interval for race data (10 seconds)
-const RACE_SYNC_INTERVAL_MS = 10000;
+// Fallback sync interval for race data (with WebSocket, this is just a safety net)
+const RACE_SYNC_INTERVAL_MS = 60000;
 
 export function useRaceData(count = 5, snapshotLimit = 30) {
   const { stocks } = useStocks({ order: 'rank', limit: count });

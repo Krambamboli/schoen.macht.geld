@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { SWRConfig } from 'swr';
 import { EffectsProvider, useEffects } from '@/contexts/effects-context';
 import { EventsProvider } from '@/contexts/events-context';
+import { WebSocketProvider } from '@/contexts/websocket-context';
 import { EffectsLayer } from '@/components/effects';
 import { EventsLayer } from '@/components/events';
 
@@ -36,10 +37,14 @@ function AppContent({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      {children}
-      <EffectsLayer />
-      <EventsLayer />
-      <Toaster />
+      <WebSocketProvider>
+        <EventsProvider>
+          {children}
+          <EffectsLayer />
+          <EventsLayer />
+          <Toaster />
+        </EventsProvider>
+      </WebSocketProvider>
     </SWRConfig>
   );
 }
@@ -63,9 +68,7 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased', poppins.variable)}>
         <EffectsProvider>
-          <EventsProvider>
-            <AppContent>{children}</AppContent>
-          </EventsProvider>
+          <AppContent>{children}</AppContent>
         </EffectsProvider>
       </body>
     </html>

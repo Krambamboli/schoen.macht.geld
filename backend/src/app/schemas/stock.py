@@ -39,7 +39,6 @@ class StockResponse(BaseModel):
     description: str
     is_active: bool
     price: float
-    price_events: list[PriceEventResponse] = []
     created_at: datetime
     updated_at: datetime
 
