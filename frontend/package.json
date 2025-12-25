@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "generate-api": "bunx @hey-api/openapi-ts -i http://localhost:8080/api/openapi.json -o src/lib/api/client"
+    "generate-api": "curl -s http://localhost:8080/api/openapi.json -o openapi.json && bunx @hey-api/openapi-ts -i openapi.json -o src/lib/api/client"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

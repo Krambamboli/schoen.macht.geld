@@ -18,6 +18,9 @@ COPY . .
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Generate API client from static OpenAPI spec
+RUN bunx @hey-api/openapi-ts -i openapi.json -o src/lib/api/client
+
 RUN bun run build
 
 # ===== Production stage =====
