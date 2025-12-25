@@ -35,7 +35,7 @@ export default function Home() {
       title: 'Markt-Display',
       description:
         'Live-Visualisierung der Marktdaten. Umfasst Börsenticker, Marktkarten und ein Terminal im Bloomberg-Stil.',
-      href: '/display/chart',
+      href: '/display/ticker',
       icon: <Presentation className="h-10 w-10" />,
     },
   ];
