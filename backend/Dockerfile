@@ -54,4 +54,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Run the application
-CMD ["uvicorn", "run", "app.main:app", "--root-path", "${ROOT_PATH}", "--host", "${UVICORN_HOST:-127.0.0.1}", "--port", "${UVICORN_PORT:-8000}", "--workers", "${UVICORN_WORKERS:-1}"]
+CMD ["uvicorn", "run", "app.main:app", "--root-path", "${ROOT_PATH}", "--host", "${UVICORN_HOST:-127.0.0.1}", "--port", "${UVICORN_PORT:-8080}", "--workers", "${UVICORN_WORKERS:-1}"]

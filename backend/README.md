@@ -20,7 +20,7 @@ uv sync
 PYTHONPATH=src uv run uvicorn app.main:app --reload
 ```
 
-Server runs at http://localhost:8000. API docs at `/docs`. Admin panel at `/admin/`.
+Server runs at http://localhost:8080. API docs at `/api/docs`. Admin panel at `/api/admin/`.
 
 ## Project Structure
 

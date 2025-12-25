@@ -91,14 +91,14 @@ uv sync
 PYTHONPATH=src uv run uvicorn app.main:app --reload
 ```
 
-API docs at http://localhost:8000/docs, Admin at http://localhost:8000/admin/
+API docs at http://localhost:8080/api/docs, Admin at http://localhost:8080/api/admin/
 
 ### Frontend
 
 ```bash
 cd frontend
 pnpm install
-NEXT_PUBLIC_API_URL=http://localhost:8000 pnpm dev
+NEXT_PUBLIC_API_URL=http://localhost:8080 pnpm dev
 ```
 
 Runs at http://localhost:3000
@@ -131,7 +131,7 @@ docker compose down
 ```
 
 Services:
-- **backend** - FastAPI on port 8000 (internal)
+- **backend** - FastAPI on port 8080 (internal)
 - **frontend** - Next.js on port 3000 (internal)
 - **caddy** - Reverse proxy on ports 80/443
 - **backup** - SQLite snapshots every 10 minutes
@@ -148,16 +148,16 @@ smg.example.com {
     }
     handle /api/* {
         uri strip_prefix /api
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
     handle /admin/* {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
     handle /docs {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
     handle /health {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
     handle {
         reverse_proxy frontend:3000

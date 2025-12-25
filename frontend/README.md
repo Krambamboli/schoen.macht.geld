@@ -67,7 +67,7 @@ The API client is auto-generated from the backend's OpenAPI spec.
 pnpm generate-api
 ```
 
-This fetches `http://localhost:8000/openapi.json` and generates TypeScript types and functions in `src/lib/api/client/`.
+This fetches `http://localhost:8080/openapi.json` and generates TypeScript types and functions in `src/lib/api/client/`.
 
 ### Usage
 
