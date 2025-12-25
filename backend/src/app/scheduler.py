@@ -14,12 +14,7 @@ from app.config import settings
 from app.database import async_session_maker
 from app.models.ai_task import AITask, TaskStatus, TaskType
 from app.models.stock import ChangeType, PriceEvent, Stock, StockSnapshot
-from app.services.atlascloud import (
-    AtlasCloudError,
-    AtlasCloudTransientError,
-    atlascloud,
-)
-from app.services.google_ai import GoogleAIError, google_ai
+from app.services.ai import AIError, ai
 
 scheduler = AsyncIOScheduler()
 
@@ -191,25 +186,11 @@ async def process_ai_tasks() -> None:
                     await _submit_task(task, session)
                 elif task.status == TaskStatus.PROCESSING:
                     await _poll_task(task, session)
-            except AtlasCloudError as e:
-                # Non-retryable API error (4xx, circuit breaker open)
-                logger.error("AtlasCloud error for task {}: {}", task.id, e)
+            except AIError as e:
+                # AI provider error (all providers failed)
+                logger.error("AI error for task {}: {}", task.id, e)
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
-                task.completed_at = datetime.now(UTC)
-                session.add(task)
-            except AtlasCloudTransientError as e:
-                # Transient error after all retries exhausted
-                logger.error("AtlasCloud transient error for task {}: {}", task.id, e)
-                task.status = TaskStatus.FAILED
-                task.error = f"Failed after retries: {e}"
-                task.completed_at = datetime.now(UTC)
-                session.add(task)
-            except GoogleAIError as e:
-                # Google AI fallback also failed
-                logger.error("Google AI error for task {}: {}", task.id, e)
-                task.status = TaskStatus.FAILED
-                task.error = f"Google AI error: {e}"
                 task.completed_at = datetime.now(UTC)
                 session.add(task)
             except OSError as e:
@@ -223,45 +204,20 @@ async def process_ai_tasks() -> None:
         await session.commit()
 
 
-async def _generate_text_with_fallback(prompt: str, model: str | None = None) -> str:
-    """Generate text using AtlasCloud with Google AI fallback.
-
-    If force_google_ai is set, uses Google AI directly.
-    Otherwise, tries AtlasCloud first, falls back to Google AI on failure.
-    """
-    # Force Google AI if configured
-    if settings.force_google_ai:
-        if not settings.google_ai_api_key:
-            raise GoogleAIError("Google AI forced but no API key configured")
-        logger.info("Using Google AI (forced via config)")
-        return await google_ai.generate_text(prompt)
-
-    # Try AtlasCloud first
-    try:
-        return await atlascloud.generate_text(prompt, model=model)
-    except (AtlasCloudError, AtlasCloudTransientError) as e:
-        # Fallback to Google AI if available
-        if not settings.google_ai_api_key:
-            raise  # Re-raise if no fallback available
-
-        logger.warning("AtlasCloud failed ({}), falling back to Google AI", e)
-        return await google_ai.generate_text(prompt)
-
-
 async def _submit_task(task: AITask, session: AsyncSession) -> None:
-    """Submit a pending task to AtlasCloud."""
+    """Submit a pending task to the AI service."""
     logger.info("Submitting {} task {}", task.task_type.value, task.id)
 
     if task.task_type == TaskType.DESCRIPTION:
         # Text generation is synchronous (fast)
-        content = await _generate_text_with_fallback(task.prompt, task.model)
+        content = await ai.generate_text(task.prompt, model=task.model)
         task.result = content.strip()
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.now(UTC)
         logger.info("Completed text task {}", task.id)
 
     elif task.task_type == TaskType.IMAGE:
-        task.atlascloud_id = await atlascloud.generate_image(
+        task.atlascloud_id = await ai.generate_image(
             task.prompt, model=task.model, **task.arguments
         )
         task.status = TaskStatus.PROCESSING
@@ -270,7 +226,7 @@ async def _submit_task(task: AITask, session: AsyncSession) -> None:
         )
 
     elif task.task_type == TaskType.VIDEO:
-        task.atlascloud_id = await atlascloud.generate_video_from_text(
+        task.atlascloud_id = await ai.generate_video_from_text(
             task.prompt, model=task.model, **task.arguments
         )
         task.status = TaskStatus.PROCESSING
@@ -303,7 +259,7 @@ async def _poll_task(task: AITask, session: AsyncSession) -> None:
         session.add(task)
         return
 
-    status, outputs, error = await atlascloud.get_task_status(task.atlascloud_id)
+    status, outputs, error = await ai.get_task_status(task.atlascloud_id)
 
     if status == "completed":
         # Download and save the result
@@ -340,7 +296,7 @@ async def _download_result(task: AITask, url: str) -> str | None:
         return None
 
     # Download file
-    content = await atlascloud.download_file(url)
+    content = await ai.download_file(url)
 
     # Save with task ID as filename
     filename = f"{task.id}{ext}"
@@ -378,11 +334,8 @@ def start_scheduler() -> None:
         settings.snapshot_retention,
     )
 
-    # AI task processor - enabled if AtlasCloud or Google AI (forced) is configured
-    ai_enabled = settings.atlascloud_api_key or (
-        settings.force_google_ai and settings.google_ai_api_key
-    )
-    if ai_enabled:
+    # AI task processor - enabled if any AI provider is configured
+    if ai.is_configured():
         _ = scheduler.add_job(  # pyright: ignore[reportUnknownMemberType]
             process_ai_tasks,
             "interval",
@@ -390,11 +343,10 @@ def start_scheduler() -> None:
             id="ai_task_processor",
             replace_existing=True,
         )
-        provider = "Google AI (forced)" if settings.force_google_ai else "AtlasCloud"
         logger.info(
             "Started AI task processor (interval: {}s, provider: {})",
             settings.ai_task_poll_interval,
-            provider,
+            ai.text_provider(),
         )
     else:
         logger.warning("No AI API key configured, AI task processor disabled")

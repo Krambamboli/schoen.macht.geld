@@ -21,8 +21,7 @@ from app.schemas.ai import (
     HeadlinesResponse,
     MessageResponse,
 )
-from app.services.atlascloud import atlascloud
-from app.services.google_ai import google_ai
+from app.services.ai import AIError, ai
 
 router = APIRouter()
 
@@ -261,18 +260,12 @@ async def generate_headlines(
 
     prompt = HEADLINES_PROMPT.format(count=count, stocks_data=stocks_data)
 
-    # Try AtlasCloud first, fall back to Google AI
+    # Generate headlines using unified AI client (handles fallback automatically)
     try:
-        response = await atlascloud.generate_text(prompt, max_tokens=count * 500)
-        response_text = str(response)
-    except Exception as e:
-        logger.warning("AtlasCloud failed, trying Google AI: {}", e)
-        try:
-            response = await google_ai.generate_text(prompt)
-            response_text = str(response)
-        except Exception as e2:
-            logger.error("Both AI providers failed: {}", e2)
-            raise HTTPException(status_code=503, detail="AI service unavailable")
+        response_text = await ai.generate_text(prompt, max_tokens=count * 500)
+    except AIError as e:
+        logger.error("AI generation failed: {}", e)
+        raise HTTPException(status_code=503, detail="AI service unavailable")
 
     # Parse JSON array from response
     try:

@@ -14,8 +14,7 @@ from app.config import settings
 from app.models.ai_task import AITask
 from app.models.stock import PriceEvent, Stock, StockSnapshot
 from app.routers.ai import DESCRIPTION_PROMPT
-from app.services.atlascloud import atlascloud
-from app.services.google_ai import google_ai
+from app.services.ai import AIError, ai
 from app.storage import ALLOWED_IMAGE_TYPES, cleanup_old_image
 
 
@@ -70,21 +69,12 @@ class StockAdmin(ModelView, model=Stock):
                 title=title, description=description or "None"
             )
 
-            # Try AtlasCloud first, fall back to Google AI
+            # Generate description using unified AI client
             try:
-                # Generate description
-                stock.description = await atlascloud.generate_text(
-                    prompt, max_tokens=500
-                )
-            except Exception as e:
-                logger.warning("AtlasCloud failed, trying Google AI: {}", e)
-                try:
-                    stock.description = await google_ai.generate_text(prompt)
-                except Exception as e2:
-                    logger.error("Both AI providers failed: {}", e2)
-                    raise HTTPException(
-                        status_code=503, detail="AI service unavailable"
-                    )
+                stock.description = await ai.generate_text(prompt, max_tokens=500)
+            except AIError as e:
+                logger.error("AI generation failed: {}", e)
+                raise HTTPException(status_code=503, detail="AI service unavailable")
 
         if is_async_session_maker(self.session_maker):  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
             async with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
