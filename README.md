@@ -23,7 +23,7 @@ cp backend/.env.example backend/.env
 docker compose up -d
 ```
 
-Access at http://localhost:8080 (or configure ports in `docker-compose.yml`)
+Access at http://localhost (or configure ports in `docker-compose.yml`)
 
 **Seed demo data (optional):**
 
@@ -68,15 +68,56 @@ Or use the admin panel at http://localhost:8080/admin/
 | `/swipe` | Swipe voting interface | Touchscreen phones/tablets |
 | `/display` | Stock ticker | Large screens / Raspberry Pi |
 | `/display/leaderboard` | Top stocks ranking | Large screens |
-| `/display/market-map` | Visual market overview | Large screens |
+| `/display/market-map` | Visual market overview (treemap) | Large screens |
 | `/display/stock-chart` | Price history charts | Large screens |
 | `/display/terminal` | News ticker + headlines | Large screens |
+| `/display/performance-race` | Animated stock race visualization | Large screens |
+| `/display/ipo-spotlight` | New stock announcements | Large screens |
+| `/display/sector-sunburst` | Sector breakdown sunburst chart | Large screens |
 | `/admin/` | Stock management | Any browser |
+
+## Real-Time Features
+
+The app uses WebSocket for live updates:
+
+- **Stock price updates** - Prices sync instantly across all displays
+- **Market events** - New leader, all-time highs, and crash alerts
+- **Market open ceremony** - Coordinated countdown across screens
+
+Events broadcast to all connected clients:
+- `stocks_update` - Full stock list refresh
+- `stock_update` - Single stock price change
+- `new_leader` - Rank #1 changed
+- `all_time_high` - Stock hit new peak
+- `big_crash` - Stock dropped below -10%
+- `market_open` - Trading session started
+
+## Pi Zero Display Options
+
+The Raspberry Pi Zero 2 W has limited RAM (512MB), making Chromium challenging. Two options:
+
+### Option 1: Lightweight Browser (Preferred if possible)
+- **Surf** - Minimal WebKit browser (~50MB RAM)
+- **Midori** - Lightweight GTK browser
+- Configure with `--kiosk` or similar flags
+
+### Option 2: Screenshot Streaming
+The backend can render views server-side and stream as images:
+
+```bash
+# MJPEG stream (~5 FPS)
+mpv --no-cache http://192.168.1.100/api/screenshot/stream/leaderboard
+
+# Single screenshot polling
+curl http://192.168.1.100/api/screenshot/leaderboard.jpg -o display.jpg
+```
+
+This uses Playwright to keep browser pages hot in memory for fast captures.
 
 ## Tech Stack
 
 - **Frontend:** Next.js 15, React 18, TypeScript, Tailwind CSS, ShadCN UI, SWR
-- **Backend:** FastAPI, SQLModel, SQLite, APScheduler
+- **Backend:** FastAPI, SQLModel, SQLite, APScheduler, Playwright
 - **AI:** AtlasCloud API (text/image/video), Google AI (fallback)
 - **Infrastructure:** Docker Compose, Caddy (reverse proxy + auto-HTTPS)
 

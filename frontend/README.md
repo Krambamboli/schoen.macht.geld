@@ -44,17 +44,23 @@ src/
 │   ├── swipe/              # Swipe interface
 │   └── display/            # Display screens
 │       ├── page.tsx        # Stock ticker
-│       ├── leaderboard/    # Top stocks
-│       ├── market-map/     # Visual market overview
+│       ├── leaderboard/    # Top stocks ranking
+│       ├── market-map/     # Visual market overview (treemap)
 │       ├── stock-chart/    # Price history charts
-│       └── terminal/       # News ticker
+│       ├── terminal/       # News ticker + headlines
+│       ├── performance-race/ # Animated stock race
+│       ├── ipo-spotlight/  # New stock announcements
+│       └── sector-sunburst/ # Sector breakdown chart
 ├── components/             # React components
 │   ├── ui/                 # ShadCN UI components
-│   └── effects/            # Visual effects (hacker mode, etc.)
+│   ├── effects/            # Visual effects (hacker mode, etc.)
+│   └── events/             # Market event overlays
 ├── contexts/               # React contexts
-│   └── effects-context.tsx # Visual effects state
+│   ├── effects-context.tsx # Visual effects state
+│   ├── events-context.tsx  # Market events state
+│   └── websocket-context.tsx # WebSocket connection
 ├── hooks/                  # Custom React hooks
-│   └── use-stocks.ts       # SWR hooks for API data
+│   └── use-stocks.ts       # SWR + WebSocket stock data
 └── lib/
     └── api/                # Generated TypeScript API client
         └── client/         # @hey-api/openapi-ts generated code
@@ -89,11 +95,37 @@ await submitSwipe('APPL', 'right', swipeToken);
 
 ## Data Fetching
 
-Uses [SWR](https://swr.vercel.app/) for data fetching with:
+Uses [SWR](https://swr.vercel.app/) combined with WebSocket for real-time updates:
 
-- Automatic revalidation every 2 seconds (for real-time updates)
+- WebSocket connection for instant price updates
+- SWR for initial data load and fallback
+- Automatic reconnection on disconnect
 - Deduplication of requests
-- Error handling
+
+## Real-Time Updates
+
+The app connects to the backend WebSocket for live data:
+
+```typescript
+// WebSocket context provides connection state
+const { isConnected, lastMessage } = useWebSocket();
+
+// Stocks hook automatically syncs with WebSocket
+const { stocks } = useStocks(); // Updates in real-time
+```
+
+### Market Events
+
+Visual overlays for market events:
+
+| Event | Description |
+|-------|-------------|
+| **Market Open** | Countdown ceremony when trading starts |
+| **New Leader** | Celebration when #1 rank changes |
+| **All-Time High** | Alert when stock hits new peak |
+| **Big Crash** | Warning when stock drops below -10% |
+
+Events are managed via `EventsContext` and displayed as full-screen overlays.
 
 ## Styling
 
@@ -118,6 +150,12 @@ The app includes toggleable visual effects for an enhanced viewing experience.
 | **Hacker Mode** | Matrix rain with scanlines and green terminal aesthetic |
 | **Drunk Mode** | Wobble and blur effect (for after-hours trading) |
 | **Redacted Mode** | Black bars over "classified" data with TOP SECRET stamps |
+| **CRT Mode** | Retro CRT monitor effect with scan lines |
+| **Neon Mode** | Cyberpunk neon glow effects |
+| **Glitch Mode** | Digital glitch and distortion effects |
+| **Aurora Mode** | Northern lights background animation |
+| **DVD Mode** | Bouncing DVD logo screensaver |
+| **Binary Mode** | Binary code rain overlay |
 
 ### Usage
 
@@ -132,15 +170,29 @@ The app includes toggleable visual effects for an enhanced viewing experience.
 ```
 src/
 ├── contexts/
-│   └── effects-context.tsx    # Global effects state
+│   ├── effects-context.tsx    # Global effects state
+│   ├── events-context.tsx     # Market events state
+│   └── websocket-context.tsx  # WebSocket connection
 └── components/
-    └── effects/
-        ├── index.tsx          # EffectsLayer wrapper
-        ├── terminal-boot.tsx  # Boot sequence
-        ├── hacker-mode.tsx    # Matrix rain
-        ├── drunk-mode.tsx     # Wobble/blur
-        ├── redacted-mode.tsx  # Black bars
-        └── settings-panel.tsx # Toggle UI
+    ├── effects/
+    │   ├── index.tsx          # EffectsLayer wrapper
+    │   ├── terminal-boot.tsx  # Boot sequence
+    │   ├── hacker-mode.tsx    # Matrix rain
+    │   ├── drunk-mode.tsx     # Wobble/blur
+    │   ├── redacted-mode.tsx  # Black bars
+    │   ├── crt-mode.tsx       # CRT monitor effect
+    │   ├── neon-mode.tsx      # Neon glow
+    │   ├── glitch-mode.tsx    # Digital glitch
+    │   ├── aurora-mode.tsx    # Northern lights
+    │   ├── dvd-mode.tsx       # DVD screensaver
+    │   ├── binary-mode.tsx    # Binary rain
+    │   └── settings-panel.tsx # Toggle UI
+    └── events/
+        ├── index.tsx          # EventsLayer wrapper
+        ├── market-open.tsx    # Market open ceremony
+        ├── new-leader-celebration.tsx # New #1 celebration
+        ├── all-time-high.tsx  # Peak price alert
+        └── big-crash.tsx      # Crash warning
 ```
 
 See [VISUAL_ENHANCEMENTS_TODO.md](./VISUAL_ENHANCEMENTS_TODO.md) for planned features.

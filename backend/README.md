@@ -35,7 +35,8 @@ src/app/
 ├── models/           # SQLModel database models
 ├── schemas/          # Pydantic request/response schemas
 ├── routers/          # API endpoints
-└── services/         # External services (AtlasCloud, Google AI)
+├── services/         # External services (AtlasCloud, Google AI, Screenshot)
+└── websocket.py      # WebSocket connection manager
 data/
 ├── stocks.db         # SQLite database (auto-created)
 └── static/           # Static files (images, videos)
@@ -107,6 +108,29 @@ Full interactive docs at `/docs` (Swagger UI).
 | GET | /ai/tasks/{id} | Get task status |
 | POST | /ai/tasks/{id}/apply | Apply result to stock |
 | DELETE | /ai/tasks/{id} | Delete task |
+
+### Screenshot Endpoints
+
+For rendering display views to images (useful for Raspberry Pi displays).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /screenshot/views | List available views |
+| GET | /screenshot/{view}.jpg | Get single screenshot |
+| GET | /screenshot/stream/{view} | MJPEG stream (default 5 FPS) |
+| POST | /screenshot/reload | Reload all pages |
+| POST | /screenshot/reload/{view} | Reload specific page |
+
+### WebSocket
+
+| Path | Description |
+|------|-------------|
+| ws://host/api/stocks/ws | Real-time stock updates |
+
+WebSocket message types:
+- `stocks_update` - Full stock list
+- `stock_update` - Single stock change
+- `event` - Market events (new_leader, all_time_high, big_crash, market_open)
 
 ### API Examples
 
@@ -283,6 +307,23 @@ All settings via environment variables or `.env` file.
 | SWIPE_BASE_PERCENT_MAX | 0.03 | Max price change (3%) |
 | SWIPE_STREAK_THRESHOLD | 5 | Buckets for streak detection |
 | SWIPE_STREAK_PENALTY | 0.7 | Multiplier when streak detected |
+
+### Screenshot Service
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| SCREENSHOT_ENABLED | true | Enable screenshot service |
+| SCREENSHOT_FRONTEND_URL | http://localhost:3000 | Frontend URL to capture |
+| SCREENSHOT_INTERVAL | 0.2 | Seconds between captures (~5 FPS) |
+| SCREENSHOT_WIDTH | 1920 | Viewport width |
+| SCREENSHOT_HEIGHT | 1080 | Viewport height |
+| SCREENSHOT_QUALITY | 85 | JPEG quality (1-100) |
+| SCREENSHOT_VIEWS | [...] | List of views to capture |
+
+Requires Playwright and Chromium:
+```bash
+uv run playwright install chromium
+```
 
 ## Development
 

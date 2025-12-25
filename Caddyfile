@@ -10,25 +10,25 @@
 
     # API requests to backend
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
 
     # Admin panel (backend)
     handle /admin/* {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
 
     # OpenAPI docs (backend)
     handle /docs {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
     handle /openapi.json {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
 
     # Health check (backend)
     handle /health {
-        reverse_proxy backend:8000
+        reverse_proxy backend:8080
     }
 
     # Everything else to frontend

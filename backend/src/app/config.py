@@ -62,6 +62,22 @@ class Settings(BaseSettings):
     ai_task_poll_interval: int = 10  # seconds between polling for AI task status
     ai_task_timeout: int = 300  # max seconds to wait for AI task completion
 
+    # Screenshot service settings
+    screenshot_enabled: bool = True
+    screenshot_frontend_url: str = "http://localhost:3000"
+    screenshot_interval: float = 0.2  # seconds between captures (~5 FPS)
+    screenshot_width: int = 1920
+    screenshot_height: int = 1080
+    screenshot_quality: int = 85  # JPEG quality (1-100)
+    screenshot_views: list[str] = [
+        "market-map",
+        "terminal",
+        "leaderboard",
+        "stock-chart",
+        "performance-race",
+        "ipo-spotlight",
+    ]
+
     # Swipe settings
     swipe_bucket_duration: int = 20  # seconds per bucket
     swipe_bucket_count: int = 30  # number of buckets (~10 min with 20s buckets)

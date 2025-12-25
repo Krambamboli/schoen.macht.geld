@@ -25,7 +25,7 @@ export default function DisplayLayout({
   const activeTab = pathname.split('/').pop() || 'ticker';
 
   const navItems = [
-    { id: 'display', label: 'Börsenticker', href: '/display', icon: CandlestickChart },
+    { id: 'chart', label: 'Börsenticker', href: '/display/chart', icon: CandlestickChart },
     { id: 'market-map', label: 'Marktübersicht', href: '/display/market-map', icon: BarChart2 },
     { id: 'terminal', label: 'Terminal', href: '/display/terminal', icon: Tv2 },
     { id: 'leaderboard', label: 'Rangliste', href: '/display/leaderboard', icon: TrendingUp },
