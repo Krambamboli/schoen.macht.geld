@@ -238,6 +238,13 @@ async def update_stock_price(
     # Update stock price (denormalized for fast access)
     stock.price = new_price
     stock.updated_at = datetime.now(UTC)
+
+    # Track max/min prices for the session
+    if stock.max_price is None or new_price > stock.max_price:
+        stock.max_price = new_price
+    if stock.min_price is None or new_price < stock.min_price:
+        stock.min_price = new_price
+
     session.add(stock)
 
     # Create price event for history

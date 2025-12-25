@@ -82,6 +82,7 @@ The app uses WebSocket for live updates:
 
 - **Stock price updates** - Prices sync instantly across all displays
 - **Market events** - New leader, all-time highs, and crash alerts
+- **Market lifecycle** - Open/close events, optional after-hours trading
 - **Market open ceremony** - Coordinated countdown across screens
 
 Events broadcast to all connected clients:
@@ -91,6 +92,7 @@ Events broadcast to all connected clients:
 - `all_time_high` - Stock hit new peak
 - `big_crash` - Stock dropped below -10%
 - `market_open` - Trading session started
+- `market_close` - Trading day ended (may enter after-hours)
 
 ## Pi Zero Display Options
 

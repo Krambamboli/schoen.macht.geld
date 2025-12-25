@@ -3,12 +3,8 @@
 from fastapi import WebSocket
 from loguru import logger
 
-from app.config import settings
 from app.models.stock import Stock
 from app.schemas.stock import StockResponse
-
-# Event detection thresholds
-CRASH_THRESHOLD = -10.0  # Trigger crash event at -10% or worse
 
 
 class ConnectionManager:
@@ -16,12 +12,6 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         self.active_connections: list[WebSocket] = []
-        # State for event detection
-        self._previous_leader: str | None = None
-        self._highest_prices: dict[str, float] = {}
-        # Market day tracking
-        self._snapshot_count: int = 0
-        self._market_day_count: int = 0
 
     async def connect(self, websocket: WebSocket) -> None:
         """Accept a new WebSocket connection."""
@@ -76,148 +66,10 @@ class ConnectionManager:
         stock_data = StockResponse.model_validate(stock).model_dump(mode="json")
         await self.broadcast({"type": "stock_update", "stock": stock_data})
 
-    async def detect_and_broadcast_events(
-        self,
-        stocks: list[Stock],
-        previous_stocks: dict[str, Stock] | None = None,
-    ) -> None:
-        """Detect market events and broadcast them.
-
-        Events detected:
-        - new_leader: When rank #1 changes
-        - all_time_high: When a stock hits a new highest price
-        - big_crash: When a stock drops below CRASH_THRESHOLD
-        """
-        if not stocks:
-            return
-
-        events: list[dict[str, object]] = []
-
-        # Find current leader (rank 1)
-        leader = min(stocks, key=lambda s: s.rank or 999)
-
-        # New leader detection
-        if self._previous_leader is not None and leader.ticker != self._previous_leader:
-            events.append(
-                {
-                    "type": "event",
-                    "event_type": "new_leader",
-                    "stock": StockResponse.model_validate(leader).model_dump(
-                        mode="json"
-                    ),
-                    "metadata": {"previous_leader_ticker": self._previous_leader},
-                }
-            )
-            logger.info("Event: new_leader - {} took the lead", leader.ticker)
-
-        self._previous_leader = leader.ticker
-
-        # Per-stock events
-        for stock in stocks:
-            prev_highest = self._highest_prices.get(stock.ticker, 0)
-
-            # All-time high detection
-            if stock.price > prev_highest and prev_highest > 0:
-                events.append(
-                    {
-                        "type": "event",
-                        "event_type": "all_time_high",
-                        "stock": StockResponse.model_validate(stock).model_dump(
-                            mode="json"
-                        ),
-                        "metadata": {
-                            "previous_high": prev_highest,
-                            "new_high": stock.price,
-                        },
-                    }
-                )
-                logger.info(
-                    "Event: all_time_high - {} hit {:.2f}", stock.ticker, stock.price
-                )
-
-            self._highest_prices[stock.ticker] = max(stock.price, prev_highest)
-
-            # Big crash detection
-            if previous_stocks and stock.ticker in previous_stocks:
-                prev = previous_stocks[stock.ticker]
-                prev_pct = prev.percentage_change
-                curr_pct = stock.percentage_change
-
-                # Only trigger if crossing the threshold (wasn't already below)
-                if prev_pct is not None and curr_pct is not None:
-                    if prev_pct > CRASH_THRESHOLD and curr_pct <= CRASH_THRESHOLD:
-                        events.append(
-                            {
-                                "type": "event",
-                                "event_type": "big_crash",
-                                "stock": StockResponse.model_validate(stock).model_dump(
-                                    mode="json"
-                                ),
-                                "metadata": {"crash_percent": curr_pct},
-                            }
-                        )
-                        logger.info(
-                            "Event: big_crash - {} dropped to {:.1f}%",
-                            stock.ticker,
-                            curr_pct,
-                        )
-
-        # Broadcast all events
+    async def broadcast_events(self, events: list[dict[str, object]]) -> None:
+        """Broadcast a list of market events."""
         for event in events:
             await self.broadcast(event)
-
-    async def track_snapshot_and_check_market_day(
-        self, stocks: list[Stock]
-    ) -> None:
-        """Track snapshot count and broadcast market day events.
-
-        Events:
-        - market_open: First snapshot, or first snapshot after market_close
-        - market_close: When snapshots_per_market_day snapshots complete
-        """
-        self._snapshot_count += 1
-        snapshots_per_day = settings.snapshots_per_market_day
-
-        # Market open: first snapshot of a new day
-        if self._snapshot_count == 1:
-            event: dict[str, object] = {
-                "type": "event",
-                "event_type": "market_open",
-                "metadata": {
-                    "market_day": self._market_day_count + 1,
-                    "snapshots_per_day": snapshots_per_day,
-                },
-            }
-            await self.broadcast(event)
-            logger.info("Event: market_open - Day {} started", self._market_day_count + 1)
-
-        # Market day end: full day complete
-        if self._snapshot_count >= snapshots_per_day:
-            self._market_day_count += 1
-            self._snapshot_count = 0
-
-            # Find leader for the day summary
-            leader = min(stocks, key=lambda s: s.rank or 999) if stocks else None
-
-            event = {
-                "type": "event",
-                "event_type": "market_close",
-                "metadata": {
-                    "market_day": self._market_day_count,
-                    "snapshots_per_day": snapshots_per_day,
-                },
-            }
-            if leader:
-                event["leader"] = StockResponse.model_validate(leader).model_dump(
-                    mode="json"
-                )
-
-            await self.broadcast(event)
-            logger.info(
-                "Event: market_close - Day {} complete ({} snapshots)",
-                self._market_day_count,
-                snapshots_per_day,
-            )
 
 
 # Global manager instance

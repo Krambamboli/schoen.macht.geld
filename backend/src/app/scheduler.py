@@ -17,8 +17,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.config import settings
 from app.database import async_session_maker, get_query_stats, reset_query_stats
 from app.models.ai_task import AITask, TaskStatus, TaskType
-from app.models.stock import ChangeType, PriceEvent, Stock, StockSnapshot
+from app.models.stock import ChangeType, MarketState, PriceEvent, Stock, StockSnapshot
 from app.services.ai import AIError, ai
+from app.services.market_events import market_events_service
 from app.websocket import manager as ws_manager
 
 scheduler = AsyncIOScheduler()
@@ -66,6 +67,21 @@ AI_IMAGE_DIR = "ai_images"
 AI_VIDEO_DIR = "ai_videos"
 
 
+async def _get_or_create_market_state(session: AsyncSession) -> MarketState:
+    """Get or create the singleton MarketState record."""
+    result = await session.exec(select(MarketState).where(MarketState.id == 1))
+    market_state = result.first()
+
+    if market_state is None:
+        market_state = MarketState(id=1)
+        session.add(market_state)
+        await session.commit()
+        await session.refresh(market_state)
+        logger.info("Created initial MarketState")
+
+    return market_state
+
+
 @timed_task
 async def tick_prices() -> None:
     """Apply random price changes to all active stocks."""
@@ -77,9 +93,18 @@ async def tick_prices() -> None:
             logger.debug("No active stocks to tick")
             return
 
+        # Get market state to check if we're in after-hours
+        market_state = await _get_or_create_market_state(session)
+        volatility_multiplier = (
+            settings.after_hours_volatility_multiplier
+            if not market_state.is_open
+            else 1.0
+        )
+
         for stock in stocks:
             # Random delta between -5% and +5% of current price
-            max_delta = stock.price * 0.05
+            # Reduced during after-hours trading
+            max_delta = stock.price * 0.05 * volatility_multiplier
             delta = random.uniform(-max_delta, max_delta)
 
             # Enforce price >= 0
@@ -88,6 +113,13 @@ async def tick_prices() -> None:
             # Update stock price (denormalized for fast access)
             stock.price = new_price
             stock.updated_at = datetime.now(UTC)
+
+            # Track max/min prices for the session
+            if stock.max_price is None or new_price > stock.max_price:
+                stock.max_price = new_price
+            if stock.min_price is None or new_price < stock.min_price:
+                stock.min_price = new_price
+
             session.add(stock)
 
             # Record price event for history
@@ -109,7 +141,7 @@ async def tick_prices() -> None:
 async def snapshot_prices() -> None:
     """Take price snapshots for all active stocks.
 
-    Updates reference_price for percentage change calculation,
+    Updates reference_price only on market open for percentage change calculation,
     creates StockSnapshot entries for graph history,
     and calculates rankings.
     """
@@ -121,18 +153,31 @@ async def snapshot_prices() -> None:
             logger.debug("No active stocks to snapshot")
             return
 
+        # Get or create market state
+        market_state = await _get_or_create_market_state(session)
+
         # Capture previous state for event detection
         previous_stocks = {s.ticker: Stock.model_validate(s) for s in stocks}
+        previous_market_state = MarketState.model_validate(market_state)
 
         now = datetime.now(UTC)
 
-        # Calculate rankings before updating reference prices
+        # Calculate rankings
         _update_rankings(stocks)
 
+        # Handle very first market open (when starting fresh)
+        if market_state.market_day_count == 0 and market_state.snapshot_count == 0 and not market_state.is_open:
+            market_state.is_open = True
+            for stock in stocks:
+                stock.reference_price = stock.price
+                stock.reference_price_at = now
+                stock.max_price = stock.price
+                stock.min_price = stock.price
+                session.add(stock)
+            logger.info("Initial market opened, reference prices set")
+
+        # Create snapshots for all stocks
         for stock in stocks:
-            # Update reference price for percentage change calculation
-            stock.reference_price = stock.price
-            stock.reference_price_at = now
             session.add(stock)
 
             # Create snapshot for graph history
@@ -142,17 +187,75 @@ async def snapshot_prices() -> None:
             )
             session.add(snapshot)
 
+        # Update market state based on current phase
+        market_state.updated_at = now
+
+        if market_state.is_open:
+            # During market hours - count regular snapshots
+            market_state.snapshot_count += 1
+
+            # Check if we've completed a market day
+            if market_state.snapshot_count >= settings.snapshots_per_market_day:
+                # Market day complete - close and enter after-hours
+                market_state.market_day_count += 1
+                market_state.snapshot_count = 0
+                market_state.is_open = False
+                market_state.after_hours_snapshot_count = 0
+                logger.info(
+                    "Market day {} completed, entering after-hours",
+                    market_state.market_day_count,
+                )
+
+                # If no after-hours period, immediately open next market day
+                if settings.after_hours_snapshots == 0:
+                    market_state.is_open = True
+                    for stock in stocks:
+                        stock.reference_price = stock.price
+                        stock.reference_price_at = now
+                        stock.max_price = stock.price
+                        stock.min_price = stock.price
+                        session.add(stock)
+
+                    logger.info(
+                        "Market day {} opened immediately, reference prices set",
+                        market_state.market_day_count + 1,
+                    )
+        else:
+            # During after-hours - count after-hours snapshots
+            market_state.after_hours_snapshot_count += 1
+
+            # Check if after-hours period is complete
+            if market_state.after_hours_snapshot_count >= settings.after_hours_snapshots:
+                # After-hours complete - open next market day
+                market_state.is_open = True
+                market_state.after_hours_snapshot_count = 0
+                for stock in stocks:
+                    stock.reference_price = stock.price
+                    stock.reference_price_at = now
+                    stock.max_price = stock.price
+                    stock.min_price = stock.price
+                    session.add(stock)
+
+                logger.info(
+                    "After-hours complete, market day {} opened, reference prices set",
+                    market_state.market_day_count + 1,
+                )
+
+        session.add(market_state)
         await session.commit()
         logger.debug("Created snapshots for {} stocks", len(stocks))
 
         # Broadcast updated stocks via WebSocket
         await ws_manager.broadcast_stocks_update(stocks)
 
-        # Detect and broadcast market events
-        await ws_manager.detect_and_broadcast_events(stocks, previous_stocks)
+        # Detect market events
+        events = market_events_service.detect_events(stocks, previous_stocks, market_state)
+        market_day_events = market_events_service.get_market_day_events(
+            stocks, market_state, previous_market_state
+        )
 
-        # Track snapshots and check for market day completion
-        await ws_manager.track_snapshot_and_check_market_day(stocks)
+        # Broadcast all events
+        await ws_manager.broadcast_events(events + market_day_events)
 
         # Cleanup old snapshots
         await _cleanup_old_snapshots(session)

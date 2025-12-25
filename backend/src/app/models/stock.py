@@ -59,6 +59,25 @@ class StockSnapshot(SQLModel, table=True):
         return f"<StockSnapshot #{self.id} ({self.ticker}) {self.price}>"
 
 
+class MarketState(SQLModel, table=True):
+    """Global market state (singleton table with a single row)."""
+
+    __tablename__ = "market_state"  # pyright: ignore[reportAssignmentType]
+
+    id: int = Field(default=1, primary_key=True)  # Always 1 (singleton)
+    is_open: bool = Field(default=False)
+    snapshot_count: int = Field(default=0)  # Snapshots in current market day
+    after_hours_snapshot_count: int = Field(default=0)  # Snapshots during after-hours
+    market_day_count: int = Field(default=0)  # Total completed market days
+    created_at: datetime = Field(default_factory=partial(datetime.now, UTC))
+    updated_at: datetime = Field(default_factory=partial(datetime.now, UTC))
+
+    @override
+    def __repr__(self) -> str:
+        status = "OPEN" if self.is_open else "AFTER-HOURS"
+        return f"<MarketState [{status}] Day {self.market_day_count} Snapshot {self.snapshot_count}/{self.after_hours_snapshot_count}>"
+
+
 class Stock(SQLModel, table=True):
     """Stock database model."""
 
@@ -73,6 +92,10 @@ class Stock(SQLModel, table=True):
 
     # Current price (denormalized from PriceEvent for fast access)
     price: float = Field(default_factory=lambda: settings.stock_base_price)
+
+    # Price tracking (min/max for the trading session)
+    max_price: float | None = Field(default=None)
+    min_price: float | None = Field(default=None)
 
     # Reference price for percentage change calculation (set by snapshot job)
     reference_price: float | None = Field(default=None)

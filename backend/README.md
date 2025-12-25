@@ -54,6 +54,9 @@ data/
 | description | str | Profile description |
 | is_active | bool | Whether stock is tradeable |
 | price | float | Current price |
+| max_price | float? | Session high (resets on market open) |
+| min_price | float? | Session low (resets on market open) |
+| reference_price | float? | Market open price (for % change) |
 | rank | int? | Rank by price (1 = highest) |
 | change_rank | int? | Rank by % change (1 = top gainer) |
 
@@ -77,6 +80,18 @@ Used for price history charts.
 | ticker | str | Foreign key to Stock |
 | price | float | Price at snapshot time |
 | created_at | datetime | Timestamp |
+
+### MarketState
+
+Global singleton tracking market state and lifecycle.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | int | Always 1 (singleton) |
+| is_open | bool | Market open (true) or after-hours (false) |
+| snapshot_count | int | Snapshots taken in current market day |
+| after_hours_snapshot_count | int | Snapshots during after-hours period |
+| market_day_count | int | Total completed market days |
 
 ## API Reference
 
@@ -221,9 +236,53 @@ The scheduler runs automatically:
 
 | Job | Interval | Description |
 |-----|----------|-------------|
-| Price Tick | 60s | Random ±5% price changes |
-| Snapshots | 10s | Capture prices, calculate rankings, market day events |
+| Price Tick | 60s | Random ±5% price changes (reduced during after-hours) |
+| Snapshots | 10s | Capture prices, calculate rankings, manage market lifecycle |
 | AI Tasks | 10s | Poll and process AI generation |
+
+## Market Lifecycle
+
+The market follows a configurable day/night cycle with optional after-hours trading:
+
+### Standard Flow (AFTER_HOURS_SNAPSHOTS = 0)
+
+1. **Market Open** - Reference prices set, max/min reset
+2. **Trading Day** - N snapshots with full volatility
+3. **Market Close** → **Immediate Market Open** - New day starts instantly
+
+### With After-Hours (AFTER_HOURS_SNAPSHOTS > 0)
+
+1. **Market Open** - Reference prices set, max/min reset, `market_open` event
+2. **Trading Day** - N snapshots with full volatility (100%)
+3. **Market Close** - `market_close` event, enter after-hours mode
+4. **After-Hours Trading** - K snapshots with reduced volatility (default 30%)
+5. **After-Hours Complete** → **Market Open** - New day starts with fresh reference prices
+
+### Key Behaviors
+
+- **Reference Price**: Set on market open, remains constant during trading day
+- **Percentage Changes**: Always calculated from market open price
+- **Max/Min Prices**: Track session high/low, reset on market open
+- **After-Hours Volatility**: Configurable multiplier (default 0.3 = 30% of normal)
+- **Trading Continues**: Swipes and admin actions work during after-hours
+
+### Example Timeline
+
+With `SNAPSHOT_INTERVAL=10s`, `SNAPSHOTS_PER_MARKET_DAY=30`, `AFTER_HOURS_SNAPSHOTS=5`:
+
+```
+T=0s    Market Open (Day 1)
+T=10s   Snapshot 1
+T=20s   Snapshot 2
+...
+T=300s  Snapshot 30 → Market Close → Enter After-Hours
+T=310s  After-Hours Snapshot 1 (30% volatility)
+T=320s  After-Hours Snapshot 2 (30% volatility)
+...
+T=350s  After-Hours Snapshot 5 → Market Open (Day 2)
+T=360s  Snapshot 1
+...
+```
 
 ## Image Handling
 
@@ -272,8 +331,10 @@ All settings via environment variables or `.env` file.
 | PRICE_TICK_INTERVAL | 60 | Seconds between random ticks |
 | PRICE_TICK_ENABLED | true | Enable random price updates |
 | SNAPSHOT_INTERVAL | 10 | Seconds between snapshots |
-| SNAPSHOTS_PER_MARKET_DAY | 30 | Snapshots per market day (triggers event) |
+| SNAPSHOTS_PER_MARKET_DAY | 30 | Snapshots per market day |
 | SNAPSHOT_RETENTION | 90 | Snapshots to keep per stock |
+| AFTER_HOURS_SNAPSHOTS | 0 | After-hours snapshots (0 = instant cycling) |
+| AFTER_HOURS_VOLATILITY_MULTIPLIER | 0.3 | Volatility during after-hours (0.3 = 30%) |
 
 ### Static Files
 

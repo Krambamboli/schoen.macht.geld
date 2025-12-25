@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     snapshots_per_market_day: int = 30  # number of snapshots in a full market day
     snapshot_retention: int = 90  # number of snapshots to keep per stock
 
+    # After-hours trading settings
+    after_hours_snapshots: int = 12  # snapshots between market close and open (0 = instant)
+    after_hours_volatility_multiplier: float = 0.6  # reduce volatility to 60% during after-hours
+
     # Image upload settings
     static_dir: str = "data/static"
     max_image_size: int = 20 * 1024 * 1024  # 20MB
@@ -69,13 +73,14 @@ class Settings(BaseSettings):
     screenshot_height: int = 1080
     screenshot_quality: int = 85  # JPEG quality (1-100)
     screenshot_views: list[str] = [
-        "ticker",
-        "market-map",
         "terminal",
         "leaderboard",
+        "market-map",
         "stock-chart",
         "performance-race",
         "ipo-spotlight",
+        "sector-sunburst",
+        "bloomberg",
     ]
 
     # Swipe settings

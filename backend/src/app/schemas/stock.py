@@ -39,6 +39,8 @@ class StockResponse(BaseModel):
     description: str
     is_active: bool
     price: float
+    max_price: float | None = None
+    min_price: float | None = None
     created_at: datetime
     updated_at: datetime
 
