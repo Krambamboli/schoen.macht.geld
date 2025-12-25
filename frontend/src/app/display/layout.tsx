@@ -8,6 +8,7 @@ import { useEffects } from '@/contexts/effects-context';
 import { StockMarquee, HeadlinesMarquee } from '@/components/marquee';
 import { MarketStatusBadge } from '@/components/display';
 import { UI_MESSAGES } from '@/constants/messages';
+import { VIEW_ROUTES } from '@/hooks/use-hotkeys';
 
 // View configuration with titles for header and status bar
 const VIEW_CONFIG: Record<string, { title: string; label: string }> = {
@@ -37,19 +38,20 @@ export default function DisplayLayout({
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   // Determine the active tab from the URL path to highlight the correct tab.
-  const activeTab = pathname.split('/').pop() || 'ticker';
+  const activeTab = pathname.split('/').pop() || 'bloomberg';
   const viewConfig = VIEW_CONFIG[activeTab] || { title: activeTab.toUpperCase(), label: activeTab.toUpperCase() };
 
-  const navItems = [
-    { id: 'terminal', label: 'TERMINAL', href: '/display/terminal', fKey: 'F1' },
-    { id: 'leaderboard', label: 'RANGLISTE', href: '/display/leaderboard', fKey: 'F2' },
-    { id: 'market-map', label: 'MARKT', href: '/display/market-map', fKey: 'F3' },
-    { id: 'stock-chart', label: 'CHART', href: '/display/stock-chart', fKey: 'F4' },
-    { id: 'performance-race', label: 'RENNEN', href: '/display/performance-race', fKey: 'F5' },
-    { id: 'ipo-spotlight', label: 'IPO', href: '/display/ipo-spotlight', fKey: 'F6' },
-    { id: 'sector-sunburst', label: 'SEKTOREN', href: '/display/sector-sunburst', fKey: 'F7' },
-    { id: 'bloomberg', label: 'BLOOMBERG', href: '/display/bloomberg', fKey: 'F8' },
-  ];
+  // Build navItems from VIEW_ROUTES to ensure consistency
+  const navItems = VIEW_ROUTES.map((route) => {
+    const id = route.path.split('/').pop() || '';
+    const config = VIEW_CONFIG[id];
+    return {
+      id,
+      label: config?.label || route.label.toUpperCase(),
+      href: route.path,
+      fKey: route.key,
+    };
+  });
 
   // Update clock every second (set initial time on mount to avoid hydration mismatch)
   useEffect(() => {
@@ -57,27 +59,6 @@ export default function DisplayLayout({
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // F-key navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F12') {
-        e.preventDefault();
-        setSettingsPanelOpen((prev) => !prev);
-        return;
-      }
-      const fKeyMatch = e.key.match(/^F([1-8])$/);
-      if (fKeyMatch) {
-        e.preventDefault();
-        const index = parseInt(fKeyMatch[1]) - 1;
-        if (navItems[index]) {
-          router.push(navItems[index].href);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [router, setSettingsPanelOpen]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });

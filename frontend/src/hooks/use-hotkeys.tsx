@@ -7,7 +7,7 @@ import { toast } from '@/hooks/use-toast'
 
 // View routes mapped to F keys
 const VIEW_ROUTES = [
-  { key: 'F1', path: '/display/ticker', label: 'Ticker' },
+  { key: 'F1', path: '/display/bloomberg', label: 'Bloomberg' },
   { key: 'F2', path: '/display/market-map', label: 'Market Map' },
   { key: 'F3', path: '/display/terminal', label: 'Terminal' },
   { key: 'F4', path: '/display/leaderboard', label: 'Leaderboard' },
@@ -58,7 +58,7 @@ export function HotkeysProvider({ children }: { children: React.ReactNode }) {
             <span className="font-semibold">E</span> = Disable all effects
           </div>
           <div>
-            <span className="font-semibold">S</span> = Settings panel
+            <span className="font-semibold">F12</span> = Settings panel
           </div>
           <div>
             <span className="font-semibold">?</span> = Show this help
@@ -101,10 +101,10 @@ export function HotkeysProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Handle S for settings
-      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Handle F12 to toggle settings panel
+      if (e.key === 'F12') {
         e.preventDefault()
-        setSettingsPanelOpen(true)
+        setSettingsPanelOpen((prev) => !prev)
         return
       }
 
