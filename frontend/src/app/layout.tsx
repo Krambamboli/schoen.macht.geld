@@ -1,6 +1,6 @@
 'use client';
 
-import { Poppins } from 'next/font/google';
+import { VT323 } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
@@ -10,10 +10,11 @@ import { EventsProvider } from '@/contexts/events-context';
 import { WebSocketProvider } from '@/contexts/websocket-context';
 import { EffectsLayer } from '@/components/effects';
 import { EventsLayer } from '@/components/events';
+import { HotkeysProvider } from '@/hooks/use-hotkeys';
 
-const poppins = Poppins({
+const vt323 = VT323({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400'],
   variable: '--font-body',
 });
 
@@ -39,10 +40,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
     >
       <WebSocketProvider>
         <EventsProvider>
-          {children}
-          <EffectsLayer />
-          <EventsLayer />
-          <Toaster />
+          <HotkeysProvider>
+            {children}
+            <EffectsLayer />
+            <EventsLayer />
+            <Toaster />
+          </HotkeysProvider>
         </EventsProvider>
       </WebSocketProvider>
     </SWRConfig>
@@ -66,7 +69,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={cn('font-body antialiased', poppins.variable)}>
+      <body className={cn('font-body antialiased', vt323.variable)}>
         <EffectsProvider>
           <AppContent>{children}</AppContent>
         </EffectsProvider>

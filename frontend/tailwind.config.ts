@@ -13,9 +13,9 @@ export default {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       fontFamily: {
-        body: ['Poppins', 'sans-serif'],
-        headline: ['Poppins', 'sans-serif'],
-        code: ['monospace'],
+        body: ['var(--font-body)', 'VT323', 'monospace'],
+        headline: ['var(--font-body)', 'VT323', 'monospace'],
+        code: ['var(--font-body)', 'VT323', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',

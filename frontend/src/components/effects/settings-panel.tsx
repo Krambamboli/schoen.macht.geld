@@ -1,8 +1,9 @@
 'use client'
 
-import { Settings } from 'lucide-react'
+import { Settings, Keyboard } from 'lucide-react'
 import { useEffects, EffectType } from '@/contexts/effects-context'
 import { useEvents } from '@/contexts/events-context'
+import { EFFECT_KEYS, useHotkeys } from '@/hooks/use-hotkeys'
 import {
   Sheet,
   SheetContent,
@@ -75,6 +76,12 @@ const VISUAL_MODES: EffectOption[] = [
   },
 ]
 
+// Helper to get hotkey for an effect
+const getEffectHotkey = (effectId: EffectType): string | null => {
+  const mapping = EFFECT_KEYS.find((ek) => ek.effect === effectId)
+  return mapping?.key ?? null
+}
+
 export function SettingsPanel() {
   const {
     enabledEffects,
@@ -87,18 +94,27 @@ export function SettingsPanel() {
   } = useEffects()
 
   const { eventsEnabled, setEventsEnabled } = useEvents()
+  const { showHelp } = useHotkeys()
 
   const renderEffectToggle = (effect: EffectOption) => {
     const isEnabled = enabledEffects.has(effect.id)
     const intensity = getEffectIntensity(effect.id)
+    const hotkey = getEffectHotkey(effect.id)
 
     return (
       <div key={effect.id} className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <Label htmlFor={effect.id} className="text-base">
-              {effect.label}
-            </Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor={effect.id} className="text-base">
+                {effect.label}
+              </Label>
+              {hotkey && (
+                <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">
+                  {hotkey}
+                </kbd>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">{effect.description}</p>
           </div>
           <Switch
@@ -146,7 +162,7 @@ export function SettingsPanel() {
           <SheetHeader className="flex-shrink-0">
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
-              Toggle effects. Use Ctrl+Shift+E to open this panel.
+              Toggle effects. Press <kbd className="px-1 py-0.5 text-[10px] font-mono bg-zinc-800 rounded">S</kbd> to open/close.
             </SheetDescription>
           </SheetHeader>
 
@@ -208,6 +224,46 @@ export function SettingsPanel() {
             {/* Visual modes */}
             <div className="space-y-4">
               {VISUAL_MODES.map(renderEffectToggle)}
+            </div>
+
+            <Separator />
+
+            {/* Keyboard Shortcuts */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Keyboard Shortcuts
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">F1-F8</kbd>
+                  <span className="text-muted-foreground">Views</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">1-0</kbd>
+                  <span className="text-muted-foreground">Effects</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">E</kbd>
+                  <span className="text-muted-foreground">Disable all</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">S</kbd>
+                  <span className="text-muted-foreground">Settings</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="px-1.5 py-0.5 font-mono bg-zinc-800 text-zinc-400 rounded border border-zinc-700">?</kbd>
+                  <span className="text-muted-foreground">Help</span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={showHelp}
+                className="w-full text-xs gap-2"
+              >
+                <Keyboard className="h-3.5 w-3.5" />
+                Show All Shortcuts
+              </Button>
             </div>
 
             <Separator />
