@@ -283,6 +283,7 @@ async def generate_image(
         prompt=prompt,
         model=request.model or settings.atlascloud_image_model,
         image_type=request.image_type,
+        arguments={"width": 1280, "height": 1280,},
     )
     session.add(task)
     await session.commit()
@@ -324,6 +325,7 @@ async def generate_video(
         task_type=TaskType.VIDEO,
         prompt=prompt,
         model=model,
+        arguments={"width": 832, "height": 480,},
     )
     session.add(task)
     await session.commit()

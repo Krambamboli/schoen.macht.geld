@@ -190,13 +190,13 @@ class AtlasCloudClient:
     ) -> str:
         """Start image generation. Returns task ID for polling."""
         model = model or settings.atlascloud_image_model
-        width = min(4096, max(0, width))  # Clamp height to [0, 4096]
-        height = min(4096, max(0, height))  # Clamp height to [0, 4096]
-        size = f"{width}x{height}"
+        width = min(4096, max(128, width))  # Clamp height to [0, 4096]
+        height = min(4096, max(128, height))  # Clamp height to [0, 4096]
+        size = f"{width}*{height}"
         payload = {
             "model": model,
             "prompt": prompt,
-            "size": size,
+            "size": str(size),
         }
         logger.debug("Starting image generation with model {}", model)
         resp = await self._request("POST", "/api/v1/model/generateImage", json=payload)
