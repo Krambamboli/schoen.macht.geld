@@ -10,24 +10,28 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useStocks } from '@/hooks/use-stocks';
 import type { StockResponse } from '@/lib/api/client';
+import { generateHeadlinesAiGenerateHeadlinesPost } from '@/lib/api/client';
+
+const HEADLINE_SEPARATOR = ' +++ ';
 
 /**
- * A component that displays a scrolling news ticker with stock updates.
- * It cycles through headlines about the top performing stocks.
+ * A component that displays a continuous scrolling news ticker.
+ * All headlines scroll across the screen in sequence.
+ * New headlines are appended when loaded, old ones continue scrolling.
  */
 const NewsTicker = ({ stocks }: { stocks: StockResponse[] }) => {
-  const [headlineIndex, setHeadlineIndex] = useState(0);
+  const [headlineQueue, setHeadlineQueue] = useState<string[]>([]);
+  const hasLoadedAi = useRef(false);
 
-  // Generate headlines from top movers
-  const headlines = useMemo(() => {
+  // Generate fallback headlines from top movers
+  const fallbackHeadlines = useMemo(() => {
     if (!stocks || stocks.length === 0) {
       return ['Willkommen beim Schön. Macht. Geld. News Network.'];
     }
 
-    // Find the top stocks with the largest absolute percentage change
     const topMovers = [...stocks]
       .sort((a, b) => Math.abs(b.percent_change) - Math.abs(a.percent_change))
       .slice(0, 5);
@@ -39,34 +43,64 @@ const NewsTicker = ({ stocks }: { stocks: StockResponse[] }) => {
     });
   }, [stocks]);
 
-  // Cycle through headlines
+  // Initialize with fallback headlines
   useEffect(() => {
-    if (headlines.length > 1) {
-      const interval = setInterval(() => {
-        setHeadlineIndex((prev) => (prev + 1) % headlines.length);
-      }, 8000);
-      return () => clearInterval(interval);
+    if (headlineQueue.length === 0 && fallbackHeadlines.length > 0) {
+      setHeadlineQueue(fallbackHeadlines);
     }
-  }, [headlines]);
+  }, [fallbackHeadlines, headlineQueue.length]);
 
-  const currentHeadline = headlines[headlineIndex];
+  // Fetch AI headlines and append to queue
+  const fetchHeadlines = useCallback(async () => {
+    try {
+      const response = await generateHeadlinesAiGenerateHeadlinesPost({
+        query: { count: 5 },
+      });
+      if (response.data?.headlines && response.data.headlines.length > 0) {
+        const newHeadlines = response.data.headlines;
+        if (!hasLoadedAi.current) {
+          // First AI load: replace fallback headlines
+          setHeadlineQueue(newHeadlines);
+          hasLoadedAi.current = true;
+        } else {
+          // Subsequent loads: append new headlines
+          setHeadlineQueue((prev) => [...prev, ...newHeadlines]);
+        }
+      }
+    } catch {
+      // Keep current headlines on error
+    }
+  }, []);
+
+  // Fetch headlines on mount and every 2 minutes
+  useEffect(() => {
+    fetchHeadlines();
+    const interval = setInterval(fetchHeadlines, 120000);
+    return () => clearInterval(interval);
+  }, [fetchHeadlines]);
+
+  // Join all headlines into a single scrolling string
+  const tickerText = headlineQueue.join(HEADLINE_SEPARATOR);
+  // Animation duration scales with content length (roughly 10s per 100 chars)
+  const animationDuration = Math.max(30, Math.ceil(tickerText.length / 10));
 
   return (
     <div className="w-full bg-red-700 text-white h-10 flex items-center overflow-hidden">
-      {currentHeadline && (
-        <div
-          key={currentHeadline}
-          className="flex animate-marquee-fast whitespace-nowrap"
-          style={{ animationDuration: '30s' }}
-        >
-          <span className="text-xl font-bold px-12">{currentHeadline}</span>
-          <span className="text-xl font-bold px-12" aria-hidden="true">
-            {currentHeadline}
-          </span>
-        </div>
-      )}
+      <div
+        className="flex animate-marquee whitespace-nowrap"
+        style={{ animationDuration: `${animationDuration}s` }}
+      >
+        <span className="text-xl font-bold px-12">
+          {tickerText}
+          {HEADLINE_SEPARATOR}
+        </span>
+        <span className="text-xl font-bold px-12" aria-hidden="true">
+          {tickerText}
+          {HEADLINE_SEPARATOR}
+        </span>
+      </div>
       <style jsx>{`
-        @keyframes marquee-fast {
+        @keyframes marquee {
           from {
             transform: translateX(0%);
           }
@@ -74,8 +108,8 @@ const NewsTicker = ({ stocks }: { stocks: StockResponse[] }) => {
             transform: translateX(-50%);
           }
         }
-        .animate-marquee-fast {
-          animation: marquee-fast 30s linear infinite;
+        .animate-marquee {
+          animation: marquee ${animationDuration}s linear infinite;
         }
       `}</style>
     </div>

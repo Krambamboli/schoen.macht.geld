@@ -135,7 +135,9 @@ Generiere 5 einzigartige Schlagzeilen. Sei provokant und einprägsam. Konzentrie
 - German with proper umlauts
 - Themes: social climbing, fleeting fame, party excess, absurdity
 
-**Note**: This prompt is defined in frontend but appears unused. Should be added to backend.
+**Status**: Implemented in backend at `POST /ai/generate/headlines`.
+
+The Terminal display (`/display/terminal`) fetches AI-generated headlines on load and every 2 minutes, with stock-based headlines as fallback.
 
 ---
 
@@ -184,14 +186,19 @@ VIDEO_PROMPT = (
 1. **Replace backend description prompt** with the German frontend version
    - Adapt for text-only if multimodal (photo) isn't supported
    - Keep 350 char limit
+   - Status: Pending
 
-2. **Add headlines endpoint** to backend using the frontend prompt
-   - New endpoint: `POST /ai/generate/headlines`
-   - Input: top N volatile stocks
-   - Output: array of headline strings
+2. ~~**Add headlines endpoint** to backend using the frontend prompt~~
+   - ~~New endpoint: `POST /ai/generate/headlines`~~
+   - ~~Input: top N volatile stocks~~
+   - ~~Output: array of headline strings~~
+   - Status: **Done** - Endpoint implemented, Terminal display integrated with fallback
 
 3. **Keep image/video prompts** as-is in backend
+   - Status: Done
 
 4. **Language**: All user-facing AI outputs should be German
+   - Status: Headlines prompt is German, description prompt still English
 
 5. **Model selection**: Consider using Gemini for text (better German) and keep AtlasCloud for image/video if that's the provider setup
+   - Status: Backend uses AtlasCloud with Google AI fallback
