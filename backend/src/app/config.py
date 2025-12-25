@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     force_google_ai: bool = False  # Force use of Google AI instead of AtlasCloud
 
     # AI models (swap these to try different models)
-    atlascloud_text_model: str = "google/gemini-3-flash-preview"
+    atlascloud_text_model: str = "deepseek-ai/deepseek-v3.2"
     atlascloud_image_model: str = "black-forest-labs/flux-schnell"
     atlascloud_video_t2v_model: str = "alibaba/wan-2.2/t2v-480p-ultra-fast"
     atlascloud_video_i2v_model: str = "alibaba/wan-2.2/i2v-480p-ultra-fast"

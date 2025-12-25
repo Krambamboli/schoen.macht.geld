@@ -49,7 +49,9 @@ class StockResponse(BaseModel):
         """Extract the part of an image's path after the STATIC_DIR."""
         if v is None:
             return None
-        image_path = "http://localhost:8080/api/static/" + str(v).replace(settings.static_dir, "")
+        image_path = "http://localhost:8080/api/static/" + str(v).replace(
+            settings.static_dir, ""
+        )
         return image_path
 
     # Reference price from last snapshot (for percentage change calculation)

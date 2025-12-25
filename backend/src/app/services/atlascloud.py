@@ -79,12 +79,6 @@ class AtlasCloudClient:
             failure_threshold=5, reset_timeout=60.0
         )
 
-    def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
     @retry(
         retry=retry_if_exception_type(AtlasCloudTransientError),
         stop=stop_after_attempt(3),
@@ -95,7 +89,7 @@ class AtlasCloudClient:
         self,
         method: str,
         endpoint: str,
-        **kwargs: Any,  # pyright: ignore[reportAny, reportExplicitAny]
+        json: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
     ) -> Response:
         """Make an API request with retry logic and circuit breaker."""
         # Check circuit breaker
@@ -111,7 +105,7 @@ class AtlasCloudClient:
                     method,
                     url,
                     headers=self._headers(),
-                    **kwargs,  # pyright: ignore[reportAny]
+                    json=json,
                 )
 
                 # 4xx errors are not retryable (client error)
@@ -150,6 +144,12 @@ class AtlasCloudClient:
             logger.warning("AtlasCloud API connection error (retrying): {}", e)
             raise AtlasCloudTransientError(f"Connection error: {e}") from e
 
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
     async def generate_text(
         self,
         prompt: str,
@@ -162,9 +162,9 @@ class AtlasCloudClient:
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": 1,
-            "stream": False,
+            "max_tokens": str(max_tokens),
+            "temperature": str(1),
+            "stream": str(False),
         }
         logger.debug(f"Generating text with model {model}")
         resp = await self._request("POST", "/v1/chat/completions", json=payload)
@@ -221,7 +221,7 @@ class AtlasCloudClient:
         payload = {
             "model": model,
             "prompt": prompt,
-            "duration": duration,
+            "duration": str(duration),
             "size": size,
         }
         logger.debug(f"Starting text-to-video generation with model {model}")
@@ -248,7 +248,7 @@ class AtlasCloudClient:
             "model": model,
             "prompt": prompt,
             "image": image_url,
-            "duration": duration,
+            "duration": str(duration),
             "size": size,
         }
         logger.debug("Starting image-to-video generation with model {}", model)

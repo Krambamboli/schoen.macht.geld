@@ -16,7 +16,12 @@ from app.models.stock import (
     StockSnapshot,
     limit_price_events,
 )
-from app.schemas.stock import PriceEventResponse, StockOrder, StockResponse, StockSnapshotResponse
+from app.schemas.stock import (
+    PriceEventResponse,
+    StockOrder,
+    StockResponse,
+    StockSnapshotResponse,
+)
 from app.storage import cleanup_old_image, process_image, validate_image
 
 router = APIRouter()
@@ -31,7 +36,8 @@ async def list_stocks(
     """Get all stocks.
 
     Args:
-        order: Ordering option (default, random, rank, rank_desc, created_at, created_at_desc, change_rank, change_rank_desc)
+        order: Ordering option (default, random, rank, rank_desc, created_at,
+        created_at_desc, change_rank, change_rank_desc)
         limit: Maximum number of stocks to return
     """
     sel = select(Stock)

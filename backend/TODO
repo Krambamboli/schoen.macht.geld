@@ -230,11 +230,6 @@
   - Should be 3.12+ or whatever version is actually required
   - Also update .python-version and pyproject.toml if needed
 
-* [ ] Fix README: Model name discrepancy
-  - README says: google/gemini-3-flash-preview-developer
-  - config.py says: google/gemini-3-flash-preview
-  - Sync these to match actual working model
-
 * [ ] Document error response format & codes in README
   - What HTTP codes are returned for what errors?
   - What does the error response body look like?

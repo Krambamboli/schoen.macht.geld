@@ -1,6 +1,6 @@
 from typing import Any, override
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from loguru import logger
 from sqladmin import Admin, ModelView, action
 from sqladmin.helpers import is_async_session_maker
@@ -13,6 +13,9 @@ from starlette.responses import RedirectResponse, Response
 from app.config import settings
 from app.models.ai_task import AITask
 from app.models.stock import PriceEvent, Stock, StockSnapshot
+from app.routers.ai import DESCRIPTION_PROMPT
+from app.services.atlascloud import atlascloud
+from app.services.google_ai import google_ai
 from app.storage import ALLOWED_IMAGE_TYPES, cleanup_old_image
 
 
@@ -46,6 +49,61 @@ class StockAdmin(ModelView, model=Stock):
         "ai_tasks",
     ]
     can_export = False
+
+    @action(  # pyright: ignore[reportAny]
+        name="regenerate description",
+        label="Gen-Desc",
+        add_in_detail=True,
+    )
+    async def regenerate_description(self, request: Request) -> Response:
+        pks = request.query_params.get("pks") or ""
+        stock_pks = pks.split(",")
+        stmt = self.list_query(request).filter(col(Stock.ticker).in_(stock_pks))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        stocks = await self._run_query(stmt)  # pyright: ignore[reportAny, reportUnknownArgumentType]
+        for stock in stocks:  # pyright: ignore[reportAny]
+            # Build prompt
+            title = str(stock.title)  # pyright: ignore[reportAny]
+            description = str(
+                stock.description  # pyright: ignore[reportAny]
+            )  # TODO(mg): Use image analysis and stuff!
+            prompt = DESCRIPTION_PROMPT.format(
+                title=title, description=description or "None"
+            )
+
+            # Try AtlasCloud first, fall back to Google AI
+            try:
+                # Generate description
+                stock.description = await atlascloud.generate_text(
+                    prompt, max_tokens=500
+                )
+            except Exception as e:
+                logger.warning("AtlasCloud failed, trying Google AI: {}", e)
+                try:
+                    stock.description = await google_ai.generate_text(prompt)
+                except Exception as e2:
+                    logger.error("Both AI providers failed: {}", e2)
+                    raise HTTPException(
+                        status_code=503, detail="AI service unavailable"
+                    )
+
+        if is_async_session_maker(self.session_maker):  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+            async with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                for stock in stocks:  # pyright: ignore[reportAny]
+                    session.add(stock)  # pyright: ignore[reportUnknownMemberType]
+                await session.commit()  # pyright: ignore[reportUnknownMemberType]
+        else:
+            with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType]
+                for stock in stocks:  # pyright: ignore[reportAny]
+                    session.add(stock)  # pyright: ignore[reportUnknownMemberType]
+                session.commit()  # pyright: ignore[reportUnknownMemberType]
+
+        referer = request.headers.get("Referer")
+        if referer:
+            return RedirectResponse(referer)
+        else:
+            return RedirectResponse(
+                request.url_for("admin:list", identity=self.identity)
+            )
 
     @action(  # pyright: ignore[reportAny]
         name="clear price history",

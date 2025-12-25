@@ -216,7 +216,7 @@ Requires AtlasCloud API key. Google AI available as fallback for text.
 
 | Type | Model | Cost |
 |------|-------|------|
-| Text | google/gemini-3-flash-preview | Free |
+| Text | deepseek-ai/deepseek-v3.2 | Free |
 | Image | black-forest-labs/flux-schnell | $0.003/img |
 | Video | alibaba/wan-2.2/t2v-480p | $0.009/sec |
 
@@ -267,7 +267,7 @@ All settings via environment variables or `.env` file.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | ATLASCLOUD_API_KEY | | Required for AI features |
-| ATLASCLOUD_TEXT_MODEL | google/gemini-3-flash-preview | Text model |
+| ATLASCLOUD_TEXT_MODEL | deepseek-ai/deepseek-v3.2 | Text model |
 | ATLASCLOUD_IMAGE_MODEL | black-forest-labs/flux-schnell | Image model |
 | GOOGLE_AI_API_KEY | | Fallback for text |
 | FORCE_GOOGLE_AI | false | Always use Google AI |
