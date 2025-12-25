@@ -71,6 +71,9 @@ class Stock(SQLModel, table=True):
     description: str = ""
     is_active: bool = Field(default=True)
 
+    # Current price (denormalized from PriceEvent for fast access)
+    price: float = Field(default_factory=lambda: settings.stock_base_price)
+
     # Reference price for percentage change calculation (set by snapshot job)
     reference_price: float | None = Field(default=None)
     reference_price_at: datetime | None = Field(default=None)
@@ -112,13 +115,6 @@ class Stock(SQLModel, table=True):
         return f"<Stock [{self.ticker}] {self.title}>"
 
     @property
-    def price(self) -> float:
-        """Get current price from latest PriceEvent entry."""
-        if self.price_events:
-            return self.price_events[0].price
-        return settings.stock_base_price
-
-    @property
     def change(self) -> float | None:
         """Calculate change from reference price."""
         if self.reference_price is None or self.reference_price == 0:
@@ -145,9 +141,3 @@ class Stock(SQLModel, table=True):
         if self.change_rank is None or self.previous_change_rank is None:
             return None
         return self.previous_change_rank - self.change_rank
-
-
-def limit_price_events(s: Stock) -> Stock:
-    """Limit price events to most recent 10."""
-    s.price_events = s.price_events[:10] if s.price_events else s.price_events
-    return s

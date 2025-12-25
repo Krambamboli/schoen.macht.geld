@@ -40,9 +40,7 @@ async def list_stocks(
         created_at_desc, change_rank, change_rank_desc)
         limit: Maximum number of stocks to return
     """
-    sel = select(Stock).options(
-        selectinload(Stock.price_events)  # pyright: ignore[reportArgumentType]
-    )
+    sel = select(Stock)
 
     # Apply ordering
     match order:
@@ -68,10 +66,6 @@ async def list_stocks(
 
     result = await session.exec(sel)
     stocks = list(result.all())
-
-    # Limit to latest price_event per stock (already ordered DESC in model)
-    for stock in stocks:
-        stock.price_events = stock.price_events[:1] if stock.price_events else []
 
     logger.debug("Listed {} stocks (order={})", len(stocks), order)
     return [StockResponse.model_validate(s) for s in stocks]
@@ -111,18 +105,21 @@ async def create_stock(
         validate_image(image)
         processed_image = await process_image(image)
 
+    initial_price = max(0.0, initial_price)
+
     stock = Stock(
         ticker=ticker,
         title=title,
         image=processed_image,  # pyright: ignore[reportArgumentType]
         description=description,
+        price=initial_price,
     )
     session.add(stock)
 
-    # Create initial price event
+    # Create initial price event for history
     initial_event = PriceEvent(
         ticker=ticker,
-        price=max(0.0, initial_price),
+        price=initial_price,
         change_type=ChangeType.INITIAL,
     )
     session.add(initial_event)
@@ -209,7 +206,12 @@ async def update_stock_price(
     # Calculate new price (enforce >= 0)
     new_price = max(0.0, price)
 
-    # Create price event
+    # Update stock price (denormalized for fast access)
+    stock.price = new_price
+    stock.updated_at = datetime.now(UTC)
+    session.add(stock)
+
+    # Create price event for history
     price_event = PriceEvent(
         ticker=ticker,
         price=new_price,
@@ -217,8 +219,6 @@ async def update_stock_price(
     )
     session.add(price_event)
 
-    stock.updated_at = datetime.now(UTC)
-    session.add(stock)
     await session.commit()
     await session.refresh(stock)
 

@@ -66,7 +66,12 @@ async def swipe(
             else ChangeType.SWIPE_DOWN
         )
 
-        # Record price event
+        # Update stock price (denormalized for fast access)
+        stock.price = new_price
+        stock.updated_at = datetime.now(UTC)
+        session.add(stock)
+
+        # Record price event for history
         price_event = PriceEvent(
             ticker=ticker,
             price=new_price,
@@ -74,8 +79,6 @@ async def swipe(
         )
         session.add(price_event)
 
-        stock.updated_at = datetime.now(UTC)
-        session.add(stock)
         await session.commit()
 
         logger.debug(

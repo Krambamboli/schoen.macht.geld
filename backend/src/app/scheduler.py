@@ -10,7 +10,7 @@ from apscheduler.schedulers.asyncio import (  # pyright: ignore[reportMissingTyp
     AsyncIOScheduler,
 )
 from loguru import logger
-from sqlalchemy import delete
+from sqlalchemy import delete, func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -84,15 +84,18 @@ async def tick_prices() -> None:
             # Enforce price >= 0
             new_price = max(0.0, stock.price + delta)
 
+            # Update stock price (denormalized for fast access)
+            stock.price = new_price
+            stock.updated_at = datetime.now(UTC)
+            session.add(stock)
+
+            # Record price event for history
             price_event = PriceEvent(
                 ticker=stock.ticker,
                 price=new_price,
                 change_type=ChangeType.RANDOM,
             )
             session.add(price_event)
-
-            stock.updated_at = datetime.now(UTC)
-            session.add(stock)
 
         await session.commit()
         logger.debug("Ticked prices for {} stocks", len(stocks))
@@ -167,47 +170,33 @@ def _update_rankings(stocks: list[Stock]) -> None:
 async def _cleanup_old_snapshots(session: AsyncSession) -> None:
     """Remove snapshots beyond retention limit for each stock.
 
-    Uses efficient bulk delete instead of individual deletes.
-    For each ticker, keeps only the N most recent snapshots.
+    Uses window function to identify IDs to keep in one query, then bulk deletes.
     """
-    # Get all unique tickers in one query
-    result = await session.exec(select(StockSnapshot.ticker).distinct())
-    tickers = result.all()
+    retention = settings.snapshot_retention
 
-    total_deleted = 0
-
-    for ticker in tickers:
-        # Get IDs of snapshots to keep (most recent N)
-        keep_result = await session.exec(
-            select(StockSnapshot.id)
-            .where(StockSnapshot.ticker == ticker)
-            .order_by(col(StockSnapshot.created_at).desc())
-            .limit(settings.snapshot_retention)
+    # Subquery: rank snapshots per ticker by created_at DESC, keep top N
+    ranked = select(
+        StockSnapshot.id,
+        func.row_number()
+        .over(
+            partition_by=StockSnapshot.ticker,
+            order_by=col(StockSnapshot.created_at).desc(),
         )
-        keep_ids = list(keep_result.all())
+        .label("rn"),
+    ).subquery()
 
-        if not keep_ids:
-            continue
+    # Get IDs to keep (rank <= retention)
+    keep_ids_query = select(ranked.c.id).where(ranked.c.rn <= retention)
 
-        # Get IDs to delete (all except the ones to keep) in one query
-        delete_result = await session.exec(
-            select(StockSnapshot.id)
-            .where(StockSnapshot.ticker == ticker)
-            .where(col(StockSnapshot.id).notin_(keep_ids))
-        )
-        delete_ids = list(delete_result.all())
+    # Delete all snapshots not in the keep list
+    delete_stmt = delete(StockSnapshot).where(
+        col(StockSnapshot.id).notin_(keep_ids_query)
+    )
+    result = await session.exec(delete_stmt)  # type: ignore[arg-type]
 
-        if delete_ids:
-            # Bulk delete using raw SQL for efficiency
-            stmt = delete(StockSnapshot).where(col(StockSnapshot.id).in_(delete_ids))
-            _ = await session.exec(stmt)
-            total_deleted += len(delete_ids)
-
-    if total_deleted > 0:
+    if result.rowcount and result.rowcount > 0:  # type: ignore[union-attr]
         await session.commit()
-        logger.debug(
-            "Cleaned up {} old snapshots across {} tickers", total_deleted, len(tickers)
-        )
+        logger.debug("Cleaned up {} old snapshots", result.rowcount)
 
 
 @timed_task
