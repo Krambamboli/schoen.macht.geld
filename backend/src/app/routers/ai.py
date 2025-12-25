@@ -78,7 +78,17 @@ Sei provokant und einprägsam. Konzentriere dich auf Themen wie soziale Klettere
 vergänglichen Ruhm, schlechte Entscheidungen auf Partys, Exzesse im Zürcher Nachtleben
 und die Absurdität des Ganzen.
 
-Gib die Schlagzeilen als JSON-Array aus, z.B.: ["Schlagzeile 1", "Schlagzeile 2", ...]
+Gib die Schlagzeilen als JSON-Array aus:
+["Schlagzeile 1", "Schlagzeile 2", ...]
+
+Nutze die folgenden Markups/Formatierungsmarker in den Schlagzeilen:
+- Prozentwerte/Prozentuale Preisänderung: [percent]12.3%[/percent]
+- Preise/Schweizer Franken/CHF: [price]123.45 CHF[/price]
+- Aktien Name/stock title: [title]Aktien AG[/title]
+- Aktien Symbol/stock symbol: [symbol]AAAG[/symbol]
+Nicht alle Markups müssen in jeder Schlagzeile vorkommen.
+
+SEHR WICHTIG: Nur das JSON-Array der formatierten Schlagzeilen, kein anderer Text.
 """
 
 IMAGE_PROMPTS = {

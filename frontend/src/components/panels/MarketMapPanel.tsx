@@ -80,9 +80,6 @@ const CustomizedContent = (props: any) => {
               variant="accent"
               className="led-glow"
             />
-            {!compact && (
-              <StockTitle title={name} size="xs" className="text-primary" />
-            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <StockPrice value={price ?? 0} change={change} size="xs" />
