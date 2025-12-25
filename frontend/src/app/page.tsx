@@ -21,7 +21,7 @@ export default function Home() {
       title: 'Registrierungsstation',
       description:
         'Vor-Ort-Registrierung mit Spitznamen und Live-Fotoaufnahme. Werde eine neue Aktie auf dem Markt.',
-      href: '/admin/',
+      href: '/api/admin/',
       icon: <UserPlus className="h-10 w-10" />,
     },
     {

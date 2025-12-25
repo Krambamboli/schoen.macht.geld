@@ -49,7 +49,7 @@ class StockResponse(BaseModel):
         """Extract the part of an image's path after the STATIC_DIR."""
         if v is None:
             return None
-        image_path = "/static/" + str(v).replace(settings.static_dir, "")
+        image_path = "http://localhost:8080/api/static/" + str(v).replace(settings.static_dir, "")
         return image_path
 
     # Reference price from last snapshot (for percentage change calculation)
@@ -92,6 +92,19 @@ class StockResponse(BaseModel):
 
 class StockImageUpdate(UploadFile):
     pass
+
+
+class StockOrder(str, Enum):
+    """Stock ordering options."""
+
+    DEFAULT = "default"  # No specific order (database order)
+    RANDOM = "random"  # Random order
+    RANK = "rank"  # By price rank ascending (1, 2, 3...)
+    RANK_DESC = "rank_desc"  # By price rank descending
+    CREATED_AT = "created_at"  # Oldest first
+    CREATED_AT_DESC = "created_at_desc"  # Newest first (for IPO)
+    CHANGE_RANK = "change_rank"  # By % change rank ascending
+    CHANGE_RANK_DESC = "change_rank_desc"  # By % change rank descending
 
 
 class SwipeDirection(str, Enum):

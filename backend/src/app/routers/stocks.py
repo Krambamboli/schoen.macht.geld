@@ -16,7 +16,7 @@ from app.models.stock import (
     StockSnapshot,
     limit_price_events,
 )
-from app.schemas.stock import PriceEventResponse, StockResponse, StockSnapshotResponse
+from app.schemas.stock import PriceEventResponse, StockOrder, StockResponse, StockSnapshotResponse
 from app.storage import cleanup_old_image, process_image, validate_image
 
 router = APIRouter()
@@ -24,19 +24,42 @@ router = APIRouter()
 
 @router.get("/")
 async def list_stocks(
-    random: Annotated[bool, Query()] = False,
+    order: Annotated[StockOrder | None, Query()] = None,
     limit: Annotated[int | None, Query()] = None,
     session: AsyncSession = Depends(get_session),
 ) -> list[StockResponse]:
-    """Get all stocks."""
+    """Get all stocks.
+
+    Args:
+        order: Ordering option (default, random, rank, rank_desc, created_at, created_at_desc, change_rank, change_rank_desc)
+        limit: Maximum number of stocks to return
+    """
     sel = select(Stock)
-    if random:
-        sel = sel.order_by(func.random())
+
+    # Apply ordering
+    match order:
+        case StockOrder.RANDOM:
+            sel = sel.order_by(func.random())
+        case StockOrder.RANK:
+            sel = sel.order_by(col(Stock.rank).asc().nulls_last())
+        case StockOrder.RANK_DESC:
+            sel = sel.order_by(col(Stock.rank).desc().nulls_last())
+        case StockOrder.CREATED_AT:
+            sel = sel.order_by(col(Stock.created_at).asc())
+        case StockOrder.CREATED_AT_DESC:
+            sel = sel.order_by(col(Stock.created_at).desc())
+        case StockOrder.CHANGE_RANK:
+            sel = sel.order_by(col(Stock.change_rank).asc().nulls_last())
+        case StockOrder.CHANGE_RANK_DESC:
+            sel = sel.order_by(col(Stock.change_rank).desc().nulls_last())
+        case _:
+            pass  # Default: no ordering
+
     if limit:
         sel = sel.limit(limit)
     result = await session.exec(sel)
     stocks = result.all()
-    logger.debug("Listed {} stocks", len(stocks))
+    logger.debug("Listed {} stocks (order={})", len(stocks), order)
     return [StockResponse.model_validate(limit_price_events(s)) for s in stocks]
 
 

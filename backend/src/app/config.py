@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     snapshot_retention: int = 30  # number of snapshots to keep per stock
 
     # Image upload settings
-    static_dir: str = "./data/static"
+    static_dir: str = "data/static"
     max_image_size: int = 20 * 1024 * 1024  # 20MB
     image_max_dimension: int = 1920  # Max width/height after resize
     image_quality: int = 85  # JPEG compression quality (1-100)

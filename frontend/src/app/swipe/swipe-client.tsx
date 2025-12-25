@@ -16,7 +16,7 @@ import type { SwipeDirection } from '@/lib/api/client';
  * calls the backend to update the stock's value.
  */
 export default function SwipeClient() {
-  const { stocks, isLoading, mutate } = useStocks({ random: true });
+  const { stocks, isLoading, mutate } = useStocks({ order: 'random' });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(true);
   const [swipeToken, setSwipeToken] = useState<string | null>(null);
