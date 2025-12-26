@@ -13,7 +13,8 @@ from app.admin import setup_admin
 from app.config import settings
 from app.database import async_session_maker, engine, init_db
 from app.logger import init_logging
-from app.routers import ai, stocks, swipe
+from app.middleware import TimingMiddleware
+from app.routers import ai, market, screenshot, stocks, swipe
 from app.scheduler import (
     AI_IMAGE_DIR,
     AI_VIDEO_DIR,
@@ -21,6 +22,7 @@ from app.scheduler import (
     start_scheduler,
     stop_scheduler,
 )
+from app.services.screenshot import screenshot_service
 from app.storage import IMAGE_DIR
 
 LOCK_PATH = "./backend.lock"
@@ -50,7 +52,15 @@ async def lifespan(_: FastAPI):
             ai_image_dir.mkdir(parents=True, exist_ok=True)
 
             start_scheduler()
+
+            # Screenshot service starts lazily on first request
+
             yield
+
+            # Stop screenshot service
+            if screenshot_service.is_running:
+                await screenshot_service.stop()
+
             stop_scheduler()
             logger.info("Shutting down (main)")
     except Timeout:
@@ -64,6 +74,7 @@ app = FastAPI(
     description="Backend for the stock exchange party game",
     version="0.1.0",
     lifespan=lifespan,
+    root_path="/api",
 )
 
 app.add_middleware(
@@ -75,9 +86,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Timing middleware for performance monitoring
+app.add_middleware(TimingMiddleware)
+
 app.include_router(stocks.router, prefix="/stocks", tags=["stocks"])
 app.include_router(swipe.router, prefix="/swipe", tags=["swipe"])
 app.include_router(ai.router, prefix="/ai", tags=["ai"])
+app.include_router(screenshot.router, prefix="/screenshot", tags=["screenshot"])
+app.include_router(market.router, prefix="/market", tags=["market"])
 
 # Serve uploaded images
 app.mount("/static", StaticFiles(directory=settings.static_dir), name="data")
@@ -141,6 +157,14 @@ async def health_check():
     except Exception as e:
         checks["disk"] = {"status": "error", "error": str(e)}
         all_ok = False
+
+    # Check screenshot service
+    if settings.screenshot_enabled:
+        checks["screenshot"] = {
+            "status": "ok" if screenshot_service.is_running else "stopped",
+            "running": screenshot_service.is_running,
+            "views": len(screenshot_service.views),
+        }
 
     return {
         "status": "ok" if all_ok else "degraded",

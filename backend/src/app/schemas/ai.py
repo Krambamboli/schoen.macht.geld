@@ -84,3 +84,25 @@ class HeadlinesResponse(BaseModel):
 
     headlines: list[str]
     stocks_used: list[str]  # Tickers of stocks used for generation
+
+
+class StockInGroup(BaseModel):
+    """A stock within a sector group."""
+
+    ticker: str
+    title: str
+    price: float
+    percent_change: float
+
+
+class StockGroup(BaseModel):
+    """A sector group with AI-generated name and stocks."""
+
+    name: str  # AI-generated satirical sector name
+    stocks: list[StockInGroup]
+
+
+class StockGroupsResponse(BaseModel):
+    """Response containing AI-generated stock groupings."""
+
+    groups: list[StockGroup]

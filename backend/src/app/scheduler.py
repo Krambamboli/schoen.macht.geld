@@ -1,34 +1,88 @@
 import random
+import time
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import ParamSpec, TypeVar
 
 from apscheduler.schedulers.asyncio import (  # pyright: ignore[reportMissingTypeStubs]
     AsyncIOScheduler,
 )
 from loguru import logger
-from sqlalchemy import delete
+from sqlalchemy import delete, func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
-from app.database import async_session_maker
+from app.database import async_session_maker, get_query_stats, reset_query_stats
 from app.models.ai_task import AITask, TaskStatus, TaskType
-from app.models.stock import ChangeType, PriceEvent, Stock, StockSnapshot
-from app.services.atlascloud import (
-    AtlasCloudError,
-    AtlasCloudTransientError,
-    atlascloud,
-)
-from app.services.google_ai import GoogleAIError, google_ai
+from app.models.stock import ChangeType, MarketState, PriceEvent, Stock, StockSnapshot
+from app.services.ai import AIError, ai
+from app.services.market_events import market_events_service
+from app.websocket import manager as ws_manager
 
 scheduler = AsyncIOScheduler()
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def timed_task[**P, R](
+    func: Callable[P, Awaitable[R]],
+) -> Callable[P, Awaitable[R]]:
+    """Decorator to log timing and query stats for scheduler tasks."""
+
+    @wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        reset_query_stats()
+        start = time.perf_counter()
+        try:
+            return await func(*args, **kwargs)
+        finally:
+            duration_ms = (time.perf_counter() - start) * 1000
+            queries, db_time = get_query_stats()
+            db_time_ms = db_time * 1000
+            if duration_ms > 100 or queries > 10:
+                logger.warning(
+                    "[{}] {:.1f}ms total, {:.1f}ms DB, {} queries",
+                    func.__name__,
+                    duration_ms,
+                    db_time_ms,
+                    queries,
+                )
+            else:
+                logger.debug(
+                    "[{}] {:.1f}ms total, {:.1f}ms DB, {} queries",
+                    func.__name__,
+                    duration_ms,
+                    db_time_ms,
+                    queries,
+                )
+
+    return wrapper
 
 
 AI_IMAGE_DIR = "ai_images"
 AI_VIDEO_DIR = "ai_videos"
 
 
+async def _get_or_create_market_state(session: AsyncSession) -> MarketState:
+    """Get or create the singleton MarketState record."""
+    result = await session.exec(select(MarketState).where(MarketState.id == 1))
+    market_state = result.first()
+
+    if market_state is None:
+        market_state = MarketState(id=1)
+        session.add(market_state)
+        await session.commit()
+        await session.refresh(market_state)
+        logger.info("Created initial MarketState")
+
+    return market_state
+
+
+@timed_task
 async def tick_prices() -> None:
     """Apply random price changes to all active stocks."""
     async with async_session_maker() as session:
@@ -39,14 +93,36 @@ async def tick_prices() -> None:
             logger.debug("No active stocks to tick")
             return
 
+        # Get market state to check if we're in after-hours
+        market_state = await _get_or_create_market_state(session)
+        volatility_multiplier = (
+            settings.after_hours_volatility_multiplier
+            if not market_state.is_open
+            else 1.0
+        )
+
         for stock in stocks:
             # Random delta between -5% and +5% of current price
-            max_delta = stock.price * 0.05
+            # Reduced during after-hours trading
+            max_delta = stock.price * 0.05 * volatility_multiplier
             delta = random.uniform(-max_delta, max_delta)
 
             # Enforce price >= 0
             new_price = max(0.0, stock.price + delta)
 
+            # Update stock price (denormalized for fast access)
+            stock.price = new_price
+            stock.updated_at = datetime.now(UTC)
+
+            # Track max/min prices for the session
+            if stock.max_price is None or new_price > stock.max_price:
+                stock.max_price = new_price
+            if stock.min_price is None or new_price < stock.min_price:
+                stock.min_price = new_price
+
+            session.add(stock)
+
+            # Record price event for history
             price_event = PriceEvent(
                 ticker=stock.ticker,
                 price=new_price,
@@ -54,17 +130,18 @@ async def tick_prices() -> None:
             )
             session.add(price_event)
 
-            stock.updated_at = datetime.now(UTC)
-            session.add(stock)
-
         await session.commit()
         logger.debug("Ticked prices for {} stocks", len(stocks))
 
+        # Broadcast updated stocks via WebSocket
+        await ws_manager.broadcast_stocks_update(list(stocks))
 
+
+@timed_task
 async def snapshot_prices() -> None:
     """Take price snapshots for all active stocks.
 
-    Updates reference_price for percentage change calculation,
+    Updates reference_price only on market open for percentage change calculation,
     creates StockSnapshot entries for graph history,
     and calculates rankings.
     """
@@ -76,15 +153,31 @@ async def snapshot_prices() -> None:
             logger.debug("No active stocks to snapshot")
             return
 
+        # Get or create market state
+        market_state = await _get_or_create_market_state(session)
+
+        # Capture previous state for event detection
+        previous_stocks = {s.ticker: Stock.model_validate(s) for s in stocks}
+        previous_market_state = MarketState.model_validate(market_state)
+
         now = datetime.now(UTC)
 
-        # Calculate rankings before updating reference prices
+        # Calculate rankings
         _update_rankings(stocks)
 
+        # Handle very first market open (when starting fresh)
+        if market_state.market_day_count == 0 and market_state.snapshot_count == 0 and not market_state.is_open:
+            market_state.is_open = True
+            for stock in stocks:
+                stock.reference_price = stock.price
+                stock.reference_price_at = now
+                stock.max_price = stock.price
+                stock.min_price = stock.price
+                session.add(stock)
+            logger.info("Initial market opened, reference prices set")
+
+        # Create snapshots for all stocks
         for stock in stocks:
-            # Update reference price for percentage change calculation
-            stock.reference_price = stock.price
-            stock.reference_price_at = now
             session.add(stock)
 
             # Create snapshot for graph history
@@ -94,8 +187,75 @@ async def snapshot_prices() -> None:
             )
             session.add(snapshot)
 
+        # Update market state based on current phase
+        market_state.updated_at = now
+
+        if market_state.is_open:
+            # During market hours - count regular snapshots
+            market_state.snapshot_count += 1
+
+            # Check if we've completed a market day
+            if market_state.snapshot_count >= settings.snapshots_per_market_day:
+                # Market day complete - close and enter after-hours
+                market_state.market_day_count += 1
+                market_state.snapshot_count = 0
+                market_state.is_open = False
+                market_state.after_hours_snapshot_count = 0
+                logger.info(
+                    "Market day {} completed, entering after-hours",
+                    market_state.market_day_count,
+                )
+
+                # If no after-hours period, immediately open next market day
+                if settings.after_hours_snapshots == 0:
+                    market_state.is_open = True
+                    for stock in stocks:
+                        stock.reference_price = stock.price
+                        stock.reference_price_at = now
+                        stock.max_price = stock.price
+                        stock.min_price = stock.price
+                        session.add(stock)
+
+                    logger.info(
+                        "Market day {} opened immediately, reference prices set",
+                        market_state.market_day_count + 1,
+                    )
+        else:
+            # During after-hours - count after-hours snapshots
+            market_state.after_hours_snapshot_count += 1
+
+            # Check if after-hours period is complete
+            if market_state.after_hours_snapshot_count >= settings.after_hours_snapshots:
+                # After-hours complete - open next market day
+                market_state.is_open = True
+                market_state.after_hours_snapshot_count = 0
+                for stock in stocks:
+                    stock.reference_price = stock.price
+                    stock.reference_price_at = now
+                    stock.max_price = stock.price
+                    stock.min_price = stock.price
+                    session.add(stock)
+
+                logger.info(
+                    "After-hours complete, market day {} opened, reference prices set",
+                    market_state.market_day_count + 1,
+                )
+
+        session.add(market_state)
         await session.commit()
         logger.debug("Created snapshots for {} stocks", len(stocks))
+
+        # Broadcast updated stocks via WebSocket
+        await ws_manager.broadcast_stocks_update(stocks)
+
+        # Detect market events
+        events = market_events_service.detect_events(stocks, previous_stocks, market_state)
+        market_day_events = market_events_service.get_market_day_events(
+            stocks, market_state, previous_market_state
+        )
+
+        # Broadcast all events
+        await ws_manager.broadcast_events(events + market_day_events)
 
         # Cleanup old snapshots
         await _cleanup_old_snapshots(session)
@@ -129,49 +289,36 @@ def _update_rankings(stocks: list[Stock]) -> None:
 async def _cleanup_old_snapshots(session: AsyncSession) -> None:
     """Remove snapshots beyond retention limit for each stock.
 
-    Uses efficient bulk delete instead of individual deletes.
-    For each ticker, keeps only the N most recent snapshots.
+    Uses window function to identify IDs to keep in one query, then bulk deletes.
     """
-    # Get all unique tickers in one query
-    result = await session.exec(select(StockSnapshot.ticker).distinct())
-    tickers = result.all()
+    retention = settings.snapshot_retention
 
-    total_deleted = 0
-
-    for ticker in tickers:
-        # Get IDs of snapshots to keep (most recent N)
-        keep_result = await session.exec(
-            select(StockSnapshot.id)
-            .where(StockSnapshot.ticker == ticker)
-            .order_by(col(StockSnapshot.created_at).desc())
-            .limit(settings.snapshot_retention)
+    # Subquery: rank snapshots per ticker by created_at DESC, keep top N
+    ranked = select(
+        StockSnapshot.id,
+        func.row_number()
+        .over(
+            partition_by=StockSnapshot.ticker,
+            order_by=col(StockSnapshot.created_at).desc(),
         )
-        keep_ids = list(keep_result.all())
+        .label("rn"),
+    ).subquery()
 
-        if not keep_ids:
-            continue
+    # Get IDs to keep (rank <= retention)
+    keep_ids_query = select(ranked.c.id).where(ranked.c.rn <= retention)
 
-        # Get IDs to delete (all except the ones to keep) in one query
-        delete_result = await session.exec(
-            select(StockSnapshot.id)
-            .where(StockSnapshot.ticker == ticker)
-            .where(col(StockSnapshot.id).notin_(keep_ids))
-        )
-        delete_ids = list(delete_result.all())
+    # Delete all snapshots not in the keep list
+    delete_stmt = delete(StockSnapshot).where(
+        col(StockSnapshot.id).notin_(keep_ids_query)
+    )
+    result = await session.exec(delete_stmt)  # type: ignore[arg-type]
 
-        if delete_ids:
-            # Bulk delete using raw SQL for efficiency
-            stmt = delete(StockSnapshot).where(col(StockSnapshot.id).in_(delete_ids))
-            _ = await session.exec(stmt)
-            total_deleted += len(delete_ids)
-
-    if total_deleted > 0:
+    if result.rowcount and result.rowcount > 0:  # type: ignore[union-attr]
         await session.commit()
-        logger.debug(
-            "Cleaned up {} old snapshots across {} tickers", total_deleted, len(tickers)
-        )
+        logger.debug("Cleaned up {} old snapshots", result.rowcount)
 
 
+@timed_task
 async def process_ai_tasks() -> None:
     """Process pending and in-progress AI tasks."""
     async with async_session_maker() as session:
@@ -192,25 +339,11 @@ async def process_ai_tasks() -> None:
                     await _submit_task(task, session)
                 elif task.status == TaskStatus.PROCESSING:
                     await _poll_task(task, session)
-            except AtlasCloudError as e:
-                # Non-retryable API error (4xx, circuit breaker open)
-                logger.error("AtlasCloud error for task {}: {}", task.id, e)
+            except AIError as e:
+                # AI provider error (all providers failed)
+                logger.error("AI error for task {}: {}", task.id, e)
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
-                task.completed_at = datetime.now(UTC)
-                session.add(task)
-            except AtlasCloudTransientError as e:
-                # Transient error after all retries exhausted
-                logger.error("AtlasCloud transient error for task {}: {}", task.id, e)
-                task.status = TaskStatus.FAILED
-                task.error = f"Failed after retries: {e}"
-                task.completed_at = datetime.now(UTC)
-                session.add(task)
-            except GoogleAIError as e:
-                # Google AI fallback also failed
-                logger.error("Google AI error for task {}: {}", task.id, e)
-                task.status = TaskStatus.FAILED
-                task.error = f"Google AI error: {e}"
                 task.completed_at = datetime.now(UTC)
                 session.add(task)
             except OSError as e:
@@ -224,65 +357,35 @@ async def process_ai_tasks() -> None:
         await session.commit()
 
 
-async def _generate_text_with_fallback(
-    prompt: str, model: str | None = None
-) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
-    """Generate text using AtlasCloud with Google AI fallback.
-
-    If force_google_ai is set, uses Google AI directly.
-    Otherwise tries AtlasCloud first, falls back to Google AI on failure.
-    """
-    # Force Google AI if configured
-    if settings.force_google_ai:
-        if not settings.google_ai_api_key:
-            raise GoogleAIError("Google AI forced but no API key configured")
-        logger.info("Using Google AI (forced via config)")
-        return await google_ai.generate_text(prompt)
-
-    # Try AtlasCloud first
-    try:
-        return await atlascloud.generate_text(prompt, model)
-    except (AtlasCloudError, AtlasCloudTransientError) as e:
-        # Fallback to Google AI if available
-        if not settings.google_ai_api_key:
-            raise  # Re-raise if no fallback available
-
-        logger.warning("AtlasCloud failed ({}), falling back to Google AI", e)
-        return await google_ai.generate_text(prompt)
-
-
 async def _submit_task(task: AITask, session: AsyncSession) -> None:
-    """Submit a pending task to AtlasCloud."""
+    """Submit a pending task to the AI service."""
     logger.info("Submitting {} task {}", task.task_type.value, task.id)
 
     if task.task_type == TaskType.DESCRIPTION:
         # Text generation is synchronous (fast)
-        response = await _generate_text_with_fallback(task.prompt, task.model)
-        # Extract text from chat completion response
-        content = response.get("choices", [{}])[0].get("message", {}).get("content", "")  # pyright: ignore[reportAny]
-        task.result = content.strip()  # pyright: ignore[reportAny]
+        content = await ai.generate_text(task.prompt, model=task.model)
+        task.result = content.strip()
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.now(UTC)
         logger.info("Completed text task {}", task.id)
 
     elif task.task_type == TaskType.IMAGE:
-        response = await atlascloud.generate_image(task.prompt, task.model)
-        data = response.get("data", {})  # pyright: ignore[reportAny]
-        task.atlascloud_id = data.get("id")  # pyright: ignore[reportAny]
+        task.atlascloud_id = await ai.generate_image(
+            task.prompt, model=task.model, **task.arguments
+        )
         task.status = TaskStatus.PROCESSING
         logger.info(
             "Started image task {}, atlascloud_id={}", task.id, task.atlascloud_id
         )
 
     elif task.task_type == TaskType.VIDEO:
-        response = await atlascloud.generate_video_from_text(task.prompt, task.model)
-        data = response.get("data", {})  # pyright: ignore[reportAny]
-        task.atlascloud_id = data.get("id")  # pyright: ignore[reportAny]
+        task.atlascloud_id = await ai.generate_video_from_text(
+            task.prompt, model=task.model, **task.arguments
+        )
         task.status = TaskStatus.PROCESSING
         logger.info(
             "Started video task {}, atlascloud_id={}", task.id, task.atlascloud_id
         )
-
     session.add(task)
 
 
@@ -309,22 +412,21 @@ async def _poll_task(task: AITask, session: AsyncSession) -> None:
         session.add(task)
         return
 
-    response = await atlascloud.get_task_status(task.atlascloud_id)
-    data = response.get("data", {})  # pyright: ignore[reportAny]
-    status = data.get("status", "").lower()  # pyright: ignore[reportAny]
+    status, outputs, error = await ai.get_task_status(task.atlascloud_id)
 
     if status == "completed":
         # Download and save the result
-        output_urls = data.get("outputs", [])  # pyright: ignore[reportAny]
-        if output_urls:
-            await _download_result(task, output_urls[0])  # pyright: ignore[reportAny]
+        if outputs:
+            task.result = await _download_result(
+                task, outputs[0]
+            )  # TODO(mg): Add support for multiple outputs
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.now(UTC)
         logger.info("Task {} completed: {}", task.id, task.result)
 
     elif status == "failed":
         task.status = TaskStatus.FAILED
-        task.error = data.get("error", "Unknown error")  # pyright: ignore[reportAny]
+        task.error = error
         task.completed_at = datetime.now(UTC)
         logger.error("Task {} failed: {}", task.id, task.error)
 
@@ -333,7 +435,7 @@ async def _poll_task(task: AITask, session: AsyncSession) -> None:
     session.add(task)
 
 
-async def _download_result(task: AITask, url: str) -> None:
+async def _download_result(task: AITask, url: str) -> str | None:
     """Download generated media and save locally."""
     # Determine directory & file extension
     static_path = Path(settings.static_dir)
@@ -344,18 +446,17 @@ async def _download_result(task: AITask, url: str) -> None:
         ext = ".mp4"
         dl_path = static_path / AI_VIDEO_DIR
     else:
-        return
+        return None
 
     # Download file
-    content = await atlascloud.download_file(url)
+    content = await ai.download_file(url)
 
     # Save with task ID as filename
     filename = f"{task.id}{ext}"
     filepath = dl_path / filename
     _ = filepath.write_bytes(content)
-
-    task.result = str(filepath)
     logger.info("Downloaded {} to {}", task.task_type.value, filepath)
+    return str(filepath)
 
 
 def start_scheduler() -> None:
@@ -380,17 +481,17 @@ def start_scheduler() -> None:
         id="price_snapshot",
         replace_existing=True,
     )
+    market_day_duration = settings.snapshot_interval * settings.snapshots_per_market_day
     logger.info(
-        "Started snapshot scheduler (interval: {}s, retention: {})",
+        "Started snapshot scheduler (interval: {}s, retention: {}, market day: {}s / {} snapshots)",
         settings.snapshot_interval,
         settings.snapshot_retention,
+        market_day_duration,
+        settings.snapshots_per_market_day,
     )
 
-    # AI task processor - enabled if AtlasCloud or Google AI (forced) is configured
-    ai_enabled = settings.atlascloud_api_key or (
-        settings.force_google_ai and settings.google_ai_api_key
-    )
-    if ai_enabled:
+    # AI task processor - enabled if any AI provider is configured
+    if ai.is_configured():
         _ = scheduler.add_job(  # pyright: ignore[reportUnknownMemberType]
             process_ai_tasks,
             "interval",
@@ -398,11 +499,10 @@ def start_scheduler() -> None:
             id="ai_task_processor",
             replace_existing=True,
         )
-        provider = "Google AI (forced)" if settings.force_google_ai else "AtlasCloud"
         logger.info(
             "Started AI task processor (interval: {}s, provider: {})",
             settings.ai_task_poll_interval,
-            provider,
+            ai.text_provider(),
         )
     else:
         logger.warning("No AI API key configured, AI task processor disabled")

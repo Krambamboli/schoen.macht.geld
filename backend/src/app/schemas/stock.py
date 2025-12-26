@@ -39,18 +39,28 @@ class StockResponse(BaseModel):
     description: str
     is_active: bool
     price: float
-    price_events: list[PriceEventResponse] = []
+    max_price: float | None = None
+    min_price: float | None = None
     created_at: datetime
     updated_at: datetime
 
     @field_validator("image", mode="before")
     @classmethod
     def extract_image_url(cls, v: object) -> str | None:
-        """Extract the part of an image's path after the STATIC_DIR."""
+        """Convert stored image path to full URL."""
         if v is None:
             return None
-        image_path = "/static/" + str(v).replace(settings.static_dir, "")
-        return image_path
+        # v may contain full path like "data/static/images/XXXX.jpg"
+        # Extract path relative to static_dir
+        path = str(v)
+        static_dir = settings.static_dir.rstrip("/")
+        if path.startswith(static_dir):
+            relative_path = path[len(static_dir) :].lstrip("/")
+        else:
+            relative_path = path.lstrip("/")
+        base = settings.base_url.rstrip("/")
+        root = settings.root_path.rstrip("/")
+        return f"{base}{root}/static/{relative_path}"
 
     # Reference price from last snapshot (for percentage change calculation)
     reference_price: float | None = None
@@ -70,44 +80,41 @@ class StockResponse(BaseModel):
     @computed_field
     @property
     def initial_price(self) -> float:
-        """Get initial price from first entry."""
-        if self.price_events:
-            return self.price_events[-1].price
+        """Get reference price (from last snapshot) as base for change calculation."""
+        if self.reference_price is not None:
+            return self.reference_price
         return settings.stock_base_price
 
     @computed_field
     @property
     def change(self) -> float:
-        """Absolute change from initial price."""
+        """Absolute change from reference price."""
         return self.price - self.initial_price
 
     @computed_field
     @property
     def percent_change(self) -> float:
-        """Percentage change from initial price (total lifetime change)."""
+        """Percentage change from reference price."""
         if self.initial_price == 0:
             return 0.0
         return (self.change / self.initial_price) * 100
 
 
-class StockCreate(BaseModel):
-    """Schema for creating a stock."""
-
-    ticker: str
-    title: str
-    description: str = ""
-    initial_price: float = settings.stock_base_price
-
-
-class StockPriceUpdate(BaseModel):
-    """Schema for manipulating stock price."""
-
-    delta: float
-    change_type: ChangeType = ChangeType.ADMIN
-
-
 class StockImageUpdate(UploadFile):
     pass
+
+
+class StockOrder(str, Enum):
+    """Stock ordering options."""
+
+    DEFAULT = "default"  # No specific order (database order)
+    RANDOM = "random"  # Random order
+    RANK = "rank"  # By price rank ascending (1, 2, 3...)
+    RANK_DESC = "rank_desc"  # By price rank descending
+    CREATED_AT = "created_at"  # Oldest first
+    CREATED_AT_DESC = "created_at_desc"  # Newest first (for IPO)
+    CHANGE_RANK = "change_rank"  # By % change rank ascending
+    CHANGE_RANK_DESC = "change_rank_desc"  # By % change rank descending
 
 
 class SwipeDirection(str, Enum):
@@ -117,18 +124,10 @@ class SwipeDirection(str, Enum):
     RIGHT = "right"
 
 
-class SwipeRequest(BaseModel):
-    """Schema for a swipe action."""
-
-    ticker: str
-    direction: SwipeDirection
-    swipe_token: str | None = None  # Token from previous swipe response
-
-
 class SwipeResponse(BaseModel):
     """Response after a swipe action."""
 
     ticker: str
     new_price: float
     delta: float  # actual change applied
-    swipe_token: str  # token for next request
+    token: str  # token for next request

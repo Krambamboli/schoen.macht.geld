@@ -1,14 +1,22 @@
 from typing import Any, override
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from loguru import logger
-from sqladmin import Admin, ModelView
+from sqladmin import Admin, ModelView, action
+from sqladmin.helpers import is_async_session_maker
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import Select
+from sqlmodel import col
 from starlette.requests import Request
+from starlette.responses import RedirectResponse, Response
 
 from app.config import settings
 from app.models.ai_task import AITask
 from app.models.stock import PriceEvent, Stock, StockSnapshot
+from app.routers.ai import DESCRIPTION_PROMPT
+from app.services.ai import AIError, ai
 from app.storage import ALLOWED_IMAGE_TYPES, cleanup_old_image
 
 
@@ -21,6 +29,7 @@ class StockAdmin(ModelView, model=Stock):
         "is_active",
         "created_at",
         "updated_at",
+        "snapshots",
         "price_events",
         "ai_tasks",
     ]
@@ -28,7 +37,8 @@ class StockAdmin(ModelView, model=Stock):
     column_sortable_list = ["ticker", "is_active"]
     column_default_sort = [("ticker", False)]
     column_formatters_detail = {
-        "price_events": lambda m, _: [repr(p) for p in m.price_events]  # pyright: ignore[reportUnknownLambdaType, reportUnknownMemberType, reportUnknownArgumentType]
+        "snapshots": lambda m, _: [repr(p) for p in m.snapshots],  # pyright: ignore[reportUnknownLambdaType, reportUnknownMemberType, reportUnknownArgumentType]
+        "price_events": lambda m, _: [repr(p) for p in m.price_events],  # pyright: ignore[reportUnknownLambdaType, reportUnknownMemberType, reportUnknownArgumentType]
     }
     form_include_pk = True
     form_widget_args = {"image": {"accept": "image/*", "capture": "environment"}}
@@ -40,6 +50,90 @@ class StockAdmin(ModelView, model=Stock):
         "ai_tasks",
     ]
     can_export = False
+
+    @action(  # pyright: ignore[reportAny]
+        name="regenerate description",
+        label="Gen-Desc",
+        add_in_detail=True,
+    )
+    async def regenerate_description(self, request: Request) -> Response:
+        pks = request.query_params.get("pks") or ""
+        stock_pks = pks.split(",")
+        stmt = self.list_query(request).filter(col(Stock.ticker).in_(stock_pks))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        stocks = await self._run_query(stmt)  # pyright: ignore[reportAny, reportUnknownArgumentType]
+        for stock in stocks:  # pyright: ignore[reportAny]
+            # Build prompt
+            title = str(stock.title)  # pyright: ignore[reportAny]
+            description = str(
+                stock.description  # pyright: ignore[reportAny]
+            )  # TODO(mg): Use image analysis and stuff!
+            prompt = DESCRIPTION_PROMPT.format(
+                title=title, description=description or "None"
+            )
+
+            # Generate description using unified AI client
+            try:
+                stock.description = await ai.generate_text(prompt, max_tokens=500)
+            except AIError as e:
+                logger.error("AI generation failed: {}", e)
+                raise HTTPException(status_code=503, detail="AI service unavailable")
+
+        if is_async_session_maker(self.session_maker):  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+            async with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                for stock in stocks:  # pyright: ignore[reportAny]
+                    session.add(stock)  # pyright: ignore[reportUnknownMemberType]
+                await session.commit()  # pyright: ignore[reportUnknownMemberType]
+        else:
+            with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType]
+                for stock in stocks:  # pyright: ignore[reportAny]
+                    session.add(stock)  # pyright: ignore[reportUnknownMemberType]
+                session.commit()  # pyright: ignore[reportUnknownMemberType]
+
+        referer = request.headers.get("Referer")
+        if referer:
+            return RedirectResponse(referer)
+        else:
+            return RedirectResponse(
+                request.url_for("admin:list", identity=self.identity)
+            )
+
+    @action(  # pyright: ignore[reportAny]
+        name="clear price history",
+        label="Clear History",
+        confirmation_message="Are you sure?",
+        add_in_detail=True,
+    )
+    async def clear_history(self, request: Request) -> Response:
+        pks = request.query_params.get("pks") or ""
+        stock_pks = pks.split(",")
+        if is_async_session_maker(self.session_maker):  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+            async with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                for pk in stock_pks:
+                    # Delete all price events belonging to stock
+                    stmt = delete(PriceEvent).where(col(PriceEvent.ticker) == pk)
+                    _ = await session.execute(stmt)  # pyright: ignore[reportUnknownMemberType]
+                    # Delete all stock snapshots belonging to stock
+                    stmt = delete(StockSnapshot).where(col(StockSnapshot.ticker) == pk)
+                    _ = await session.execute(stmt)  # pyright: ignore[reportUnknownMemberType]
+                await session.commit()  # pyright: ignore[reportUnknownMemberType]
+        else:
+            with self.session_maker() as session:  # pyright: ignore[reportUnknownMemberType]
+                for pk in stock_pks:
+                    # Delete all price events belonging to stock
+                    stmt = delete(PriceEvent).where(col(PriceEvent.ticker) == pk)
+                    _ = session.execute(stmt)  # pyright: ignore[reportUnknownMemberType]
+                    # Delete all stock snapshots belonging to stock
+                    stmt = delete(StockSnapshot).where(col(StockSnapshot.ticker) == pk)
+                    _ = session.execute(stmt)  # pyright: ignore[reportUnknownMemberType]
+                session.commit()  # pyright: ignore[reportUnknownMemberType]
+
+        referer = request.headers.get("Referer")
+        if referer:
+            return RedirectResponse(referer)
+        else:
+            return RedirectResponse(
+                request.url_for("admin:list", identity=self.identity)
+            )
 
     @override
     async def on_model_change(
@@ -97,6 +191,27 @@ class StockAdmin(ModelView, model=Stock):
         if old_image:
             cleanup_old_image(old_image)  # pyright: ignore[reportAny]
             logger.info("Admin: cleaned up old image for stock {}", model.ticker)
+
+    @override
+    def details_query(self, request: Request) -> Select[tuple[Stock]]:
+        """Load relationships excluded from form for detail view."""
+        stmt = self.form_edit_query(request)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        # Explicitly load relationships (noload by default in model)
+        stmt = stmt.options(selectinload(Stock.price_events))  # pyright: ignore[reportArgumentType]
+        stmt = stmt.options(selectinload(Stock.snapshots))  # pyright: ignore[reportArgumentType]
+        stmt = stmt.options(selectinload(Stock.ai_tasks))  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
+        return stmt
+
+    @override
+    async def get_object_for_details(self, request: Request) -> Stock | None:
+        """Limit loaded relationships to most recent entries."""
+        stock = await self._get_object_by_pk(self.details_query(request))  # pyright: ignore[reportAny, reportUnknownMemberType]
+        if stock:
+            # Limit to 10 latest price_events (already ordered DESC in model)
+            stock.price_events = stock.price_events[:10] if stock.price_events else []  # pyright: ignore[reportAny]
+            # Limit to 32 latest snapshots (already ordered DESC in model)
+            stock.snapshots = stock.snapshots[:32] if stock.snapshots else []  # pyright: ignore[reportAny]
+        return stock  # pyright: ignore[reportAny]
 
 
 class PriceEventAdmin(ModelView, model=PriceEvent):

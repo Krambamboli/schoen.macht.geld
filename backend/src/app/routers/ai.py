@@ -4,53 +4,75 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
+from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
 from app.database import get_session
 from app.models.ai_task import AITask, ImageType, TaskStatus, TaskType
-from app.models.stock import Stock
+from app.models.stock import PriceEvent, Stock
 from app.schemas.ai import (
     AITaskCreateResponse,
     AITaskResponse,
     ApplyResultRequest,
     GenerateDescriptionRequest,
-    GenerateHeadlinesRequest,
     GenerateImageRequest,
     GenerateVideoRequest,
     HeadlinesResponse,
     MessageResponse,
+    StockGroup,
+    StockGroupsResponse,
+    StockInGroup,
 )
-from app.services.atlascloud import atlascloud
-from app.services.google_ai import google_ai
+from app.services.ai import AIError, ai
 
 router = APIRouter()
 
 # Prompt templates (German, Party-Themed for "Schön. Macht. Geld.")
 DESCRIPTION_PROMPT = """Du bist ein Ghostwriter für die exzessive Zürcher Partyszene und
-schreibst witzige, bissige "Börsenprospekte" in der Ich-Perspektive für das Partyspiel
-"Schön. Macht. Geld.". Das Spiel wird vom "Verein für ambitionierten Konsum (VAK)" und
-dem Club "Amphitheater"veranstaltet.
-Das Motto: hedonistischer Konsum, Macht, Schönheit und Drogen.
+schreibst witzige, bissige "Börsenprospekte" für das Partyspiel "Schön. Macht. Geld.".
+Das Spiel wird vom "Verein für ambitionierten Konsum (VAK)" und dem Club "Amphitheater"
+veranstaltet. Das Motto: hedonistischer Konsum, Macht, Schönheit und Drogen.
 
-Schreibe eine sarkastische, ironische und prahlerische Profilbeschreibung in der
-Ich-Form, basierend auf dem Spitznamen der Person.
+Schreibe eine sarkastische, ironische und prahlerische Profilbeschreibung für die Aktie,
+basierend auf dem Aktientitel (Name der Person/Firma).
 
-Spitzname: {title}
+Aktientitel: {title}
 Aktuelle Beschreibung (falls vorhanden): {description}
 
 Regeln:
-1. **Perspektive:** Schreibe immer aus der Ich-Perspektive.
+1. **Stil:** Variiere zwischen verschiedenen Formaten:
+   - Ich-Perspektive (prahlerisch, selbstverliebt)
+   - Corporate Mission Statement (Unternehmensphilosophie-Parodie)
+   - Investor Pitch (Q3 Highlights, Kerngeschäft, Prognosen)
+   - Tagline (kurz, prägnant, memorable)
 2. **Ton:** Selbstverliebt, sarkastisch, satirisch. Mische Finanzjargon mit Party-Slang.
-3. **Themen:** Spiele mit Klischees über das Zürcher Nachtleben:
-               Konsum, Status, Oberflächlichkeit und Exzesse.
-4. **Länge:** Maximal 350 Zeichen (inkl. Leerzeichen).
+3. **Themen:** Zürcher Nachtleben, Konsum, Status, Oberflächlichkeit, Exzesse,
+   Networking, VIP-Kultur, fragwürdige Substanzen, Afterhours.
+4. **Länge:** Maximal 500 Zeichen (inkl. Leerzeichen).
 5. **Sprache:** Deutsch.
 
-Beispiel: "Mein Kurs? Steigt schneller als mein Puls nach der dritten Line. Ich bin
-keine Aktie, ich bin ein Gerücht, eine Legende auf dem Zürcher Parkett. Investier
-jetzt, bevor ich zu teuer für dein kleines Portfolio werde."
+Beispiele (variiere den Stil!):
+- "Mission Statement: Wir maximieren hedonistische Rendite bei minimalem Verantwortungs-
+  bewusstsein. Unsere Kernkompetenz? Networking zwischen 2 und 6 Uhr morgens."
+- "Unternehmensphilosophie: Move fast and break hearts. Unsere Stakeholder sind alle,
+  die meine Nummer haben. Meine Shareholder sind alle, die sie gerne hätten."
+- "Premium seit der Geburt. Exklusiv bis zum Blackout."
+- "Think different. Sniff different."
+- "Just do it. Frag nicht was."
+- "The Future is Now. Der Kater ist Morgen."
+- "Kerngeschäft: strategische Präsenz an exklusiven Locations. Wettbewerbsvorteil:
+  Ich kenne den Türsteher. Risikohinweis: keiner."
+- "Ich bin keine Investition – ich bin ein Lifestyle. Wer mich kauft, kauft Zugang
+  zu Räumen, die auf keiner Karte existieren. Terms & Conditions: Es gibt keine."
+- "Analyst*innen empfehlen: STRONG BUY. Meine Ex empfiehlt: SELL. Der Markt
+  entscheidet. Der Markt bin ich."
+- "Mein Portfolio besteht aus Vitamin K, fragwürdigen Entscheidungen und einem
+  Netzwerk aus Menschen, die alle 'irgendwas mit Medien' machen. ROI? Return on
+  Intoxication."
+- "Mein Lebenswerk? Eine Studie in exzessiver Selbstüberschätzung, finanziert durch
+  Vitamin B und den Glauben, dass Schlaf überbewertet ist. Kaufempfehlung: stark."
 
 Gib nur die Beschreibung aus, keinen anderen Text."""
 
@@ -65,39 +87,128 @@ von genau {count} kurzen, schlagkräftigen und urkomischen Schlagzeilen. Jede Sc
 sollte für sich stehen. Der Ton sollte scharf, ironisch und voller Satire sein. Denk an
 eine Mischung aus Society-Klatsch und Finanz-Desaster.
 
-Achte auf korrekte deutsche Rechtschreibung und die korrekte Verwendung
-von Umlauten (ä, ö, ü).
-
 Hier sind die Daten der Top-Aktien:
 {stocks_data}
 
-Generiere {count} einzigartige Schlagzeilen.
-Sei provokant und einprägsam. Konzentriere dich auf Themen wie soziale Kletterei,
-vergänglichen Ruhm, schlechte Entscheidungen auf Partys, Exzesse im Zürcher Nachtleben
-und die Absurdität des Ganzen.
+Regeln:
+1. **Sentiment passend zur Kursrichtung:**
+   - Steigende Aktien (positive Veränderung): Übertriebenes Lob, absurde Erfolgs-
+     geschichten, Hype, FOMO, "Genie entdeckt", "Investor-Liebling"
+   - Fallende Aktien (negative Veränderung): Dramatische Abstürze, Skandale, Gerüchte,
+     Schadenfreude, "Absturz des Jahres", "Panikverkäufe", "War da was auf dem Klo?"
+2. **Jede Schlagzeile MUSS den Aktientitel ODER das Börsenkürzel enthalten.**
+3. **Achte auf korrekte deutsche Rechtschreibung und Umlaute (ä, ö, ü).**
+4. **Themen:** Soziale Kletterei, vergänglicher Ruhm, Party-Fails, Exzesse im Zürcher
+   Nachtleben, VIP-Abstiege, Afterhour-Tragödien, Networking-Katastrophen.
 
-Gib die Schlagzeilen als JSON-Array aus, z.B.: ["Schlagzeile 1", "Schlagzeile 2", ...]
+Generiere {count} einzigartige Schlagzeilen. Sei provokant und einprägsam.
+
+Gib die Schlagzeilen als JSON-Array aus:
+["Schlagzeile 1", "Schlagzeile 2", ...]
+
+Nutze die folgenden Markups/Formatierungsmarker in den Schlagzeilen:
+- Prozentwerte/Prozentuale Preisänderung: [percent]12.3%[/percent]
+- Preise/Schweizer Franken/CHF: [price]123.45 CHF[/price]
+- Aktien Name/stock title: [title]Aktien AG[/title]
+- Aktien Symbol/stock symbol: [symbol]AAAG[/symbol]
+Nicht alle Markups müssen in jeder Schlagzeile vorkommen.
+
+SEHR WICHTIG: Nur das JSON-Array der formatierten Schlagzeilen, kein anderer Text.
 """
 
 IMAGE_PROMPTS = {
     ImageType.MAIN: (
-        "Corporate stock photo for {title}, professional but slightly off and weird"
+        "Corporate portrait photo for a Zurich party personality stock called '{title}'. "
+        "Professional headshot lighting with a satirical twist. The subject exudes "
+        "self-importance and excessive confidence. Style: 1980s corporate meets modern "
+        "influencer culture. Slight VHS grain or film texture. Gold and black color "
+        "accents. The person looks like they just came from a champagne-fueled networking "
+        "event. Subtle absurdity: maybe an out-of-place luxury item, unusual background, "
+        "or slightly too-perfect hair. Think: Wolf of Wall Street meets Zurich club scene."
     ),
     ImageType.LOGO: (
-        "Minimalist corporate logo for {title}, clean vector style, simple design"
+        "Minimalist corporate logo for '{title}', a satirical Zurich party stock. "
+        "Swiss design principles: clean lines, geometric shapes, single accent color. "
+        "No text, white or dark background. Hidden satirical element optional (subtle "
+        "party reference, champagne glass shape, pill outline, etc.). Style: if a "
+        "luxury Swiss bank rebranded for the club scene. Vector-ready, simple enough "
+        "to work at small sizes. Colors: gold, black, or neon accents."
     ),
     ImageType.BILLBOARD: (
-        "Highway billboard ad for {title} stock, dramatic and absurd"
+        "Highway billboard advertisement for stock '{title}'. Dramatic nighttime "
+        "lighting, bold sans-serif text saying 'INVEST NOW' or 'BUY {title}'. "
+        "Features a confident person in expensive attire looking directly at viewer. "
+        "Intentionally tacky aesthetic like a late-night infomercial or casino ad. "
+        "Lens flares, gold gradients, stock chart going up in background. "
+        "Style: Las Vegas meets Swiss private banking. Slightly desperate energy. "
+        "Think: the kind of ad that makes you question capitalism."
     ),
     ImageType.WEBSITE: (
-        "Screenshot of corporate website hero section for {title}, modern design"
+        "Hero section screenshot of a corporate website for '{title}'. Modern SaaS "
+        "aesthetic with dark mode, gradient background (purple to black or gold to "
+        "black). Floating glassmorphism UI elements. Absurdly corporate buzzwords "
+        "visible: 'Synergizing Excellence', 'Disrupting Disruption', 'Premium Human "
+        "Capital'. Fake testimonials or trust badges. Stock chart graphic. "
+        "Style: if a fintech startup was designed by someone who parties too much. "
+        "Clean typography, too many gradient buttons, subtle particle effects."
     ),
 }
 
 VIDEO_PROMPT = (
-    "15-second stock market ad for {title}. Dramatic corporate style "
-    "with text overlays showing rising stock prices. Slightly absurd tone."
+    "Corporate stock advertisement for '{title}', a satirical Zurich party personality. "
+    "Scene breakdown: "
+    "(1) Slow zoom on logo or confident person's face, dramatic lighting, 2 seconds. "
+    "(2) Abstract stock chart animation trending upward, green numbers flying, 2 seconds. "
+    "(3) Person in expensive suit nodding approvingly, champagne glass visible, 2 seconds. "
+    "(4) Final frame: '{title}' text with 'INVEST NOW' call-to-action, gold on black. "
+    "Overall style: 1980s VHS corporate video aesthetic with slight grain and scan lines. "
+    "Color palette: gold, black, green (money colors). Implied dramatic synth music. "
+    "Tone: satirical take on Wolf of Wall Street meets Swiss banking commercial. "
+    "The whole thing should feel like a parody of excess and self-importance."
 )
+
+STOCK_GROUPS_PROMPT = """Du bist ein kreativer Finanzanalyst für das Partyspiel
+"Schön. Macht. Geld.", veranstaltet vom "Verein für ambitionierten Konsum (VAK)"
+und dem Club "Amphitheater" in Zürich.
+
+Erstelle lustige, satirische "Sektoren" (Branchen/Kategorien) für die folgenden Aktien.
+Sektoren sind KATEGORIEN, in die mehrere Aktien gruppiert werden – wie Branchen an
+der echten Börse, aber satirisch auf das Zürcher Nachtleben bezogen.
+
+Aktien:
+{stocks_list}
+
+Gruppiere diese {stock_count} Aktien in genau {group_count} Sektoren.
+Jeder Sektor soll 2-4 Aktien enthalten.
+
+Regeln:
+1. **Sektornamen sind KATEGORIEN**, nicht Firmennamen. Sie beschreiben eine Gruppe
+   von ähnlichen "Persönlichkeiten" oder "Geschäftsfeldern".
+2. **Analysiere die Aktientitel** und gruppiere nach gemeinsamen Themen, Vibes oder
+   Archetypen (z.B. alle Party-Starter zusammen, alle Networker zusammen).
+3. **Variiere den Stil:** Mal als Branche, mal als Bewegung, mal als Phänomen.
+
+Beispiele für Sektornamen (KATEGORIEN, nicht Firmennamen!):
+- "Nachtaktive Rohstoffe" (Substanzen, Konsumgüter)
+- "Luxusgüter & Eitelkeiten" (Appearance-fokussierte Persönlichkeiten)
+- "Entertainment & Eskalation" (DJs, Performer, Party-Starter)
+- "Blue Chip Beauties" (Zuverlässig attraktive Dauerbrenner)
+- "Stabile Seitwärtsbewegung" (Immer da, nie aufregend)
+- "Frühschicht-Veteranen" (Die 6-Uhr-morgens-Überlebenden)
+- "Peak-Hour Performers" (1-3 Uhr Spezialisten)
+- "Pharma & Freizeitchemie" (Selbsterklärend)
+- "Kommunikation & Klatsch" (Gossip, Drama, Influencer)
+- "Transport & Eskapismus" (Immer am Gehen, Kommen, Verschwinden)
+- "Immobilien & Hinterzimmer" (VIP-Areas, exklusive Spaces)
+- "Finanzdienstleistungen" (Die, die immer "was haben")
+
+Gib das Ergebnis als JSON-Array aus:
+[
+  {{"name": "Sektor Name", "stocks": ["TICK1", "TICK2"]}},
+  ...
+]
+
+Wichtig: Verwende nur die exakten Ticker aus der Liste oben."""
 
 
 async def _get_stock_or_none(session: AsyncSession, ticker: str | None) -> Stock | None:
@@ -172,6 +283,7 @@ async def generate_image(
         prompt=prompt,
         model=request.model or settings.atlascloud_image_model,
         image_type=request.image_type,
+        arguments={"width": 1280, "height": 1280,},
     )
     session.add(task)
     await session.commit()
@@ -213,6 +325,7 @@ async def generate_video(
         task_type=TaskType.VIDEO,
         prompt=prompt,
         model=model,
+        arguments={"width": 832, "height": 480,},
     )
     session.add(task)
     await session.commit()
@@ -228,7 +341,7 @@ async def generate_video(
 
 @router.post("/generate/headlines")
 async def generate_headlines(
-    request: GenerateHeadlinesRequest,
+    count: int = 5,
     session: AsyncSession = Depends(get_session),
 ) -> HeadlinesResponse:
     """
@@ -238,43 +351,69 @@ async def generate_headlines(
     """
 
     # Clamp count to valid range
-    count = max(1, min(10, request.count))
+    count = max(1, min(10, count))
 
-    # Get top volatile stocks (sorted by absolute percent change)
-    query = select(Stock).limit(count)
+    # Get stocks with reference_price (needed for percentage_change)
+    # Relationships default to noload
+    query = (
+        select(Stock)
+        .where(col(Stock.reference_price).is_not(None))
+        .limit(count * 2)  # Get extra to sort by volatility
+    )
     result = await session.exec(query)
-    stocks = sorted(
-        result.all(),
-        key=lambda s: abs(s.percentage_change),  # pyright: ignore[reportArgumentType]
-        reverse=True,
-    )[:count]
+    stocks = list(result.all())
 
     if not stocks:
         return HeadlinesResponse(headlines=[], stocks_used=[])
 
-    # Build stocks data string for prompt
+    # Fetch latest price per stock in a single query
+    tickers = [s.ticker for s in stocks]
+    events_subq = (
+        select(
+            PriceEvent.ticker,
+            PriceEvent.price,
+            func.row_number()
+            .over(
+                partition_by=PriceEvent.ticker,
+                order_by=col(PriceEvent.created_at).desc(),
+            )
+            .label("rn"),
+        )
+        .where(col(PriceEvent.ticker).in_(tickers))
+        .subquery()
+    )
+    events_query = select(
+        events_subq.c.ticker,
+        events_subq.c.price,
+    ).where(events_subq.c.rn == 1)
+    events_result = await session.exec(events_query)
+    price_by_ticker = {ticker: price for ticker, price in events_result.all()}  # pyright: ignore[reportAny]
+
+    # Sort by absolute percentage change and take top N
+    stocks = sorted(
+        stocks,
+        key=lambda s: abs(s.percentage_change or 0),
+        reverse=True,
+    )[:count]
+
+    # Build stocks data string for prompt (use fetched prices)
     stocks_data = "\n".join(
-        f"- Börsenkürzel: {s.ticker}, Spitzname: {s.title}, "
-        + f"Aktueller Wert: {s.price:.2f} CHF, "
-        + f"Veränderung: {s.change:.2f} CHF ({s.percentage_change:.2f}%)"
+        f"- Börsenkürzel: {s.ticker}, Spitzname: {s.title}, Aktueller Wert: "
+        + f"{price_by_ticker.get(s.ticker, s.reference_price or 0):.2f} CHF, "
+        + "Veränderung: "
+        + f"{(price_by_ticker.get(s.ticker, 0) - (s.reference_price or 0)):.2f} CHF"
+        + f"({s.percentage_change:.2f}%)"
         for s in stocks
     )
 
     prompt = HEADLINES_PROMPT.format(count=count, stocks_data=stocks_data)
-    model = request.model or settings.atlascloud_text_model
 
-    # Try AtlasCloud first, fall back to Google AI
+    # Generate headlines using unified AI client (handles fallback automatically)
     try:
-        response = await atlascloud.generate_text(prompt, model, max_tokens=10000)
-        response_text = str(response["choices"][0]["message"]["content"])  # pyright: ignore[reportAny]
-    except Exception as e:
-        logger.warning("AtlasCloud failed, trying Google AI: {}", e)
-        try:
-            response = await google_ai.generate_text(prompt)
-            response_text = str(response["choices"][0]["message"]["content"])  # pyright: ignore[reportAny]
-        except Exception as e2:
-            logger.error("Both AI providers failed: {}", e2)
-            raise HTTPException(status_code=503, detail="AI service unavailable")
+        response_text = await ai.generate_text(prompt, max_tokens=count * 500)
+    except AIError as e:
+        logger.error("AI generation failed: {}", e)
+        raise HTTPException(status_code=503, detail="AI service unavailable")
 
     # Parse JSON array from response
     try:
@@ -302,6 +441,95 @@ async def generate_headlines(
         headlines=headlines[:count],
         stocks_used=[s.ticker for s in stocks],
     )
+
+
+@router.get("/generate/stock-groups")
+async def generate_stock_groups(
+    session: AsyncSession = Depends(get_session),
+) -> StockGroupsResponse:
+    """
+    Generate AI-created sector groupings for random stocks.
+
+    Returns groups of stocks with satirical sector names for sunburst visualization.
+    """
+    import random
+
+    # Fetch all stocks with prices
+    query = select(Stock).where(col(Stock.price).is_not(None))
+    result = await session.exec(query)
+    all_stocks = list(result.all())
+
+    if len(all_stocks) < 6:
+        # Not enough stocks for meaningful groups
+        return StockGroupsResponse(groups=[])
+
+    # Select 12-18 random stocks (or all if fewer)
+    stock_count = min(len(all_stocks), random.randint(4, 12))
+    selected_stocks = random.sample(all_stocks, stock_count)
+
+    # Determine number of groups (2-4 based on stock count)
+    group_count = min(4, max(2, stock_count // 3))
+
+    # Build stocks list for prompt
+    stocks_list = "\n".join(f"- {s.ticker}: {s.title}" for s in selected_stocks)
+
+    prompt = STOCK_GROUPS_PROMPT.format(
+        stocks_list=stocks_list,
+        stock_count=stock_count,
+        group_count=group_count,
+    )
+
+    # Generate groupings using AI
+    try:
+        response_text = await ai.generate_text(prompt, max_tokens=1500)
+    except AIError as e:
+        logger.error("AI generation failed for stock groups: {}", e)
+        raise HTTPException(status_code=503, detail="AI service unavailable")
+
+    # Parse JSON response
+    try:
+        json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
+        if json_match:
+            raw_groups = json.loads(json_match.group())  # pyright: ignore[reportAny]
+        else:
+            raise ValueError("No JSON array found in response")
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error(
+            "Failed to parse stock groups JSON: {} - Response: {}", e, response_text
+        )
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+
+    # Build stock lookup for enrichment
+    stock_lookup = {s.ticker: s for s in selected_stocks}
+
+    # Transform to response format with enriched stock data
+    groups: list[StockGroup] = []
+    for raw_group in raw_groups:  # pyright: ignore[reportAny]
+        group_name = raw_group.get("name", "Unbenannter Sektor")  # pyright: ignore[reportAny]
+        group_tickers = raw_group.get("stocks", [])  # pyright: ignore[reportAny]
+
+        stocks_in_group: list[StockInGroup] = []
+        for ticker in group_tickers:  # pyright: ignore[reportAny]
+            stock = stock_lookup.get(ticker)  # pyright: ignore[reportAny]
+            if stock:
+                stocks_in_group.append(
+                    StockInGroup(
+                        ticker=stock.ticker,
+                        title=stock.title,
+                        price=stock.price or 0.0,
+                        percent_change=stock.percentage_change or 0.0,
+                    )
+                )
+
+        if stocks_in_group:  # Only add non-empty groups
+            groups.append(StockGroup(name=group_name, stocks=stocks_in_group))  # pyright: ignore[reportAny]
+
+    logger.info(
+        "Generated {} stock groups with {} total stocks",
+        len(groups),
+        sum(len(g.stocks) for g in groups),
+    )
+    return StockGroupsResponse(groups=groups)
 
 
 @router.get("/tasks")

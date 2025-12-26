@@ -1,7 +1,5 @@
 """Google AI client for text generation (fallback provider)."""
 
-from typing import Any
-
 import httpx
 from loguru import logger
 
@@ -21,9 +19,7 @@ class GoogleAIClient:
         self.base_url: str = settings.google_ai_base_url.rstrip("/")
         self.api_key: str = settings.google_ai_api_key
 
-    async def generate_text(
-        self, prompt: str, model: str | None = None
-    ) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
+    async def generate_text(self, prompt: str, model: str | None = None) -> str:
         """Generate text using Google AI.
 
         Returns response in same format as AtlasCloud for compatibility:
@@ -36,7 +32,9 @@ class GoogleAIClient:
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "maxOutputTokens": 500,
-                "temperature": 1.0,
+                "temperature": settings.ai_temperature,
+                "topP": settings.ai_top_p,
+                # Note: Google AI doesn't support frequency/presence penalty
             },
         }
 
@@ -62,7 +60,7 @@ class GoogleAIClient:
                 data = response.json()  # pyright: ignore[reportAny]
 
                 # Extract text from Google's response format
-                text = (  # pyright: ignore[reportAny]
+                text = str(
                     data.get("candidates", [{}])[0]  # pyright: ignore[reportAny]
                     .get("content", {})
                     .get("parts", [{}])[0]
@@ -70,7 +68,7 @@ class GoogleAIClient:
                 )
 
                 # Return in AtlasCloud-compatible format
-                return {"choices": [{"message": {"content": text}}]}
+                return text
 
         except httpx.TimeoutException as e:
             logger.warning("Google AI API timeout: {}", e)

@@ -59,6 +59,25 @@ class StockSnapshot(SQLModel, table=True):
         return f"<StockSnapshot #{self.id} ({self.ticker}) {self.price}>"
 
 
+class MarketState(SQLModel, table=True):
+    """Global market state (singleton table with a single row)."""
+
+    __tablename__ = "market_state"  # pyright: ignore[reportAssignmentType]
+
+    id: int = Field(default=1, primary_key=True)  # Always 1 (singleton)
+    is_open: bool = Field(default=False)
+    snapshot_count: int = Field(default=0)  # Snapshots in current market day
+    after_hours_snapshot_count: int = Field(default=0)  # Snapshots during after-hours
+    market_day_count: int = Field(default=0)  # Total completed market days
+    created_at: datetime = Field(default_factory=partial(datetime.now, UTC))
+    updated_at: datetime = Field(default_factory=partial(datetime.now, UTC))
+
+    @override
+    def __repr__(self) -> str:
+        status = "OPEN" if self.is_open else "AFTER-HOURS"
+        return f"<MarketState [{status}] Day {self.market_day_count} Snapshot {self.snapshot_count}/{self.after_hours_snapshot_count}>"
+
+
 class Stock(SQLModel, table=True):
     """Stock database model."""
 
@@ -70,6 +89,13 @@ class Stock(SQLModel, table=True):
     image: StorageImage | None = Field(sa_column=Column(ImageType(storage=storage)))
     description: str = ""
     is_active: bool = Field(default=True)
+
+    # Current price (denormalized from PriceEvent for fast access)
+    price: float = Field(default_factory=lambda: settings.stock_base_price)
+
+    # Price tracking (min/max for the trading session)
+    max_price: float | None = Field(default=None)
+    min_price: float | None = Field(default=None)
 
     # Reference price for percentage change calculation (set by snapshot job)
     reference_price: float | None = Field(default=None)
@@ -89,7 +115,7 @@ class Stock(SQLModel, table=True):
     price_events: list[PriceEvent] = Relationship(  # pyright: ignore[reportAny]
         back_populates="stock",
         sa_relationship_kwargs={
-            "lazy": "selectin",
+            "lazy": "noload",
             "order_by": "PriceEvent.created_at.desc()",
         },
     )
@@ -97,23 +123,19 @@ class Stock(SQLModel, table=True):
     snapshots: list[StockSnapshot] = Relationship(  # pyright: ignore[reportAny]
         back_populates="stock",
         sa_relationship_kwargs={
-            "lazy": "selectin",
+            "lazy": "noload",
             "order_by": "StockSnapshot.created_at.desc()",
         },
     )
 
-    ai_tasks: list["AITask"] = Relationship(back_populates="stock")  # noqa: F821, UP037  # pyright: ignore[reportAny,reportUndefinedVariable]
+    ai_tasks: list["AITask"] = Relationship(  # noqa: F821, UP037  # pyright: ignore[reportAny,reportUndefinedVariable]
+        back_populates="stock",
+        sa_relationship_kwargs={"lazy": "noload"},
+    )
 
     @override
     def __repr__(self) -> str:
         return f"<Stock [{self.ticker}] {self.title}>"
-
-    @property
-    def price(self) -> float:
-        """Get current price from latest PriceEvent entry."""
-        if self.price_events:
-            return self.price_events[0].price
-        return settings.stock_base_price
 
     @property
     def change(self) -> float | None:
@@ -142,9 +164,3 @@ class Stock(SQLModel, table=True):
         if self.change_rank is None or self.previous_change_rank is None:
             return None
         return self.previous_change_rank - self.change_rank
-
-
-def limit_price_events(s: Stock) -> Stock:
-    """Limit price events to most recent 10."""
-    s.price_events = s.price_events[:10] if s.price_events else s.price_events
-    return s

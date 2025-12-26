@@ -1,14 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ===== Base stage =====
-FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat
+FROM oven/bun:1 AS base
 WORKDIR /app
 
 # ===== Dependencies stage =====
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable pnpm && pnpm install --frozen-lockfile
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile
 
 # ===== Build stage =====
 FROM base AS builder
@@ -19,7 +18,10 @@ COPY . .
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable pnpm && pnpm build
+# Generate API client from static OpenAPI spec
+RUN bunx @hey-api/openapi-ts -i openapi.json -o src/lib/api/client
+
+RUN bun run build
 
 # ===== Production stage =====
 FROM node:20-alpine AS runner

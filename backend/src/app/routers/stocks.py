@@ -1,9 +1,20 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from loguru import logger
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,36 +25,79 @@ from app.models.stock import (
     PriceEvent,
     Stock,
     StockSnapshot,
-    limit_price_events,
 )
 from app.schemas.stock import (
     PriceEventResponse,
-    StockImageUpdate,
-    StockPriceUpdate,
+    StockOrder,
     StockResponse,
     StockSnapshotResponse,
 )
 from app.storage import cleanup_old_image, process_image, validate_image
+from app.websocket import manager as ws_manager
 
 router = APIRouter()
 
 
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time stock updates.
+
+    Clients receive:
+    - stocks_update: Full list of stocks after price tick/snapshot
+    - stock_update: Single stock update after swipe
+    - event: Market events (new_leader, all_time_high, big_crash)
+    """
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive, wait for client messages (ping/pong)
+            _ = await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+
+
 @router.get("/")
 async def list_stocks(
-    random: Annotated[bool, Query()] = False,
+    order: Annotated[StockOrder | None, Query()] = None,
     limit: Annotated[int | None, Query()] = None,
     session: AsyncSession = Depends(get_session),
 ) -> list[StockResponse]:
-    """Get all stocks."""
+    """Get all stocks.
+
+    Args:
+        order: Ordering option (default, random, rank, rank_desc, created_at,
+        created_at_desc, change_rank, change_rank_desc)
+        limit: Maximum number of stocks to return
+    """
     sel = select(Stock)
-    if random:
-        sel = sel.order_by(func.random())
+
+    # Apply ordering
+    match order:
+        case StockOrder.RANDOM:
+            sel = sel.order_by(func.random())
+        case StockOrder.RANK:
+            sel = sel.order_by(col(Stock.rank).asc().nulls_last())
+        case StockOrder.RANK_DESC:
+            sel = sel.order_by(col(Stock.rank).desc().nulls_last())
+        case StockOrder.CREATED_AT:
+            sel = sel.order_by(col(Stock.created_at).asc())
+        case StockOrder.CREATED_AT_DESC:
+            sel = sel.order_by(col(Stock.created_at).desc())
+        case StockOrder.CHANGE_RANK:
+            sel = sel.order_by(col(Stock.change_rank).asc().nulls_last())
+        case StockOrder.CHANGE_RANK_DESC:
+            sel = sel.order_by(col(Stock.change_rank).desc().nulls_last())
+        case _:
+            pass  # Default: no ordering
+
     if limit:
         sel = sel.limit(limit)
+
     result = await session.exec(sel)
-    stocks = result.all()
-    logger.debug("Listed {} stocks", len(stocks))
-    return [StockResponse.model_validate(limit_price_events(s)) for s in stocks]
+    stocks = list(result.all())
+
+    logger.debug("Listed {} stocks (order={})", len(stocks), order)
+    return [StockResponse.model_validate(s) for s in stocks]
 
 
 @router.post("/")
@@ -53,7 +107,7 @@ async def create_stock(
     description: Annotated[str, Form()] = "",
     initial_price: Annotated[float | None, Form()] = None,
     session: AsyncSession = Depends(get_session),
-    image: StockImageUpdate | None = None,
+    image: UploadFile | None = None,
 ) -> StockResponse:
     """Create a new stock."""
     ticker = ticker.upper().strip()
@@ -80,18 +134,21 @@ async def create_stock(
         validate_image(image)
         processed_image = await process_image(image)
 
+    initial_price = max(0.0, initial_price)
+
     stock = Stock(
         ticker=ticker,
         title=title,
         image=processed_image,  # pyright: ignore[reportArgumentType]
         description=description,
+        price=initial_price,
     )
     session.add(stock)
 
-    # Create initial price event
+    # Create initial price event for history
     initial_event = PriceEvent(
         ticker=ticker,
-        price=max(0.0, initial_price),
+        price=initial_price,
         change_type=ChangeType.INITIAL,
     )
     session.add(initial_event)
@@ -108,17 +165,28 @@ async def get_stock(
     ticker: str, session: AsyncSession = Depends(get_session)
 ) -> StockResponse:
     """Get a single stock by ticker."""
-    stock = await session.get(Stock, ticker)
+    result = await session.exec(
+        select(Stock)
+        .where(Stock.ticker == ticker)
+        .options(selectinload(Stock.price_events))  # pyright: ignore[reportArgumentType]
+        .options(selectinload(Stock.snapshots))  # pyright: ignore[reportArgumentType]
+    )
+    stock = result.first()
     if not stock:
         logger.warning("Stock not found: {}", ticker)
         raise HTTPException(status_code=404, detail="Stock not found")
+
+    # Limit to latest entries (already ordered DESC in model)
+    stock.price_events = stock.price_events[:1] if stock.price_events else []
+    stock.snapshots = stock.snapshots[:32] if stock.snapshots else []
+
     return StockResponse.model_validate(stock)
 
 
 @router.post("/{ticker}/image")
 async def upload_stock_image(
     ticker: str,
-    image: StockImageUpdate,
+    image: UploadFile,
     session: AsyncSession = Depends(get_session),
 ) -> StockResponse:
     """Upload and store stock image locally."""
@@ -155,7 +223,7 @@ async def upload_stock_image(
 @router.post("/{ticker}/price")
 async def update_stock_price(
     ticker: str,
-    request: StockPriceUpdate,
+    price: Annotated[float, Body()],
     session: AsyncSession = Depends(get_session),
 ) -> StockResponse:
     """Manipulate stock price."""
@@ -165,26 +233,34 @@ async def update_stock_price(
         raise HTTPException(status_code=404, detail="Stock not found")
 
     # Calculate new price (enforce >= 0)
-    new_price = max(0.0, stock.price + request.delta)
+    new_price = max(0.0, price)
 
-    # Create price event
+    # Update stock price (denormalized for fast access)
+    stock.price = new_price
+    stock.updated_at = datetime.now(UTC)
+
+    # Track max/min prices for the session
+    if stock.max_price is None or new_price > stock.max_price:
+        stock.max_price = new_price
+    if stock.min_price is None or new_price < stock.min_price:
+        stock.min_price = new_price
+
+    session.add(stock)
+
+    # Create price event for history
     price_event = PriceEvent(
         ticker=ticker,
         price=new_price,
-        change_type=request.change_type,
+        change_type=ChangeType.ADMIN,
     )
     session.add(price_event)
 
-    stock.updated_at = datetime.now(UTC)
-    session.add(stock)
     await session.commit()
     await session.refresh(stock)
 
     logger.debug(
-        "{} price {} by {:.2f} -> {:.2f}",
+        "{} price -> {:.2f}",
         ticker,
-        request.change_type.value,
-        request.delta,
         new_price,
     )
     return StockResponse.model_validate(stock)
@@ -196,7 +272,7 @@ async def get_stock_snapshots(
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     session: AsyncSession = Depends(get_session),
 ) -> list[StockSnapshotResponse]:
-    """Get price snapshots for graphing."""
+    """Get stock price snapshots for graphing."""
     stock = await session.get(Stock, ticker)
     if not stock:
         logger.warning("Stock not found: {}", ticker)
@@ -205,7 +281,7 @@ async def get_stock_snapshots(
     result = await session.exec(
         select(StockSnapshot)
         .where(StockSnapshot.ticker == ticker)
-        .order_by(col(StockSnapshot.created_at).desc())
+        .order_by(col(StockSnapshot.created_at).asc())
         .limit(limit)
     )
     snapshots = result.all()

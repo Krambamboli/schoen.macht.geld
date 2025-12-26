@@ -1,3 +1,4 @@
+import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 import {
   listStocksStocksGet,
@@ -5,27 +6,70 @@ import {
   getStockSnapshotsStocksTickerSnapshotsGet,
   swipeSwipePost,
 } from '@/lib/api';
-import type { StockResponse, StockSnapshotResponse, SwipeDirection } from '@/lib/api/client';
+import type { StockOrder, StockResponse, StockSnapshotResponse, SwipeDirection } from '@/lib/api/client';
 
 // Fallback data for resilience
 const FALLBACK_STOCKS: StockResponse[] = [];
 
-export function useStocks(options?: { limit?: number; random?: boolean }) {
+// Sync interval in milliseconds - used as fallback when WebSocket is unavailable
+// With WebSocket push, this is just a safety net for missed updates
+const SYNC_INTERVAL_MS = 60000;
+
+/**
+ * Calculate milliseconds until the next synchronized refresh time.
+ * All clients will refresh at the same wall clock moments.
+ */
+function getMsUntilNextSync(intervalMs: number): number {
+  const now = Date.now();
+  const msIntoInterval = now % intervalMs;
+  return intervalMs - msIntoInterval;
+}
+
+/**
+ * Hook that calls a revalidation callback at synchronized wall clock times.
+ */
+function useSyncedRevalidation(revalidate: () => void, intervalMs: number = SYNC_INTERVAL_MS): void {
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNext = () => {
+      const msUntilNext = getMsUntilNextSync(intervalMs);
+      timeoutId = setTimeout(() => {
+        revalidate();
+        scheduleNext();
+      }, msUntilNext);
+    };
+
+    scheduleNext();
+
+    return () => clearTimeout(timeoutId);
+  }, [revalidate, intervalMs]);
+}
+
+export interface UseStocksOptions {
+  limit?: number;
+  order?: StockOrder;
+}
+
+export function useStocks(options?: UseStocksOptions) {
   const { data, error, isLoading, mutate } = useSWR(
-    ['stocks', options?.limit, options?.random],
+    ['stocks', options?.limit, options?.order],
     async () => {
       const response = await listStocksStocksGet({
-        query: { limit: options?.limit, random: options?.random },
+        query: { limit: options?.limit, order: options?.order },
       });
       return response.data;
     },
     {
       fallbackData: FALLBACK_STOCKS,
-      refreshInterval: 2000,
       revalidateOnFocus: false,
       dedupingInterval: 1000,
     }
   );
+
+  // Sync revalidation to wall clock
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate);
 
   return {
     stocks: data ?? FALLBACK_STOCKS,
@@ -38,7 +82,7 @@ export function useStocks(options?: { limit?: number; random?: boolean }) {
 
 export function useStock(ticker: string | null) {
   const { data, error, isLoading, mutate } = useSWR(
-    ticker ? `stock-${ticker}` : null,
+    ticker ? ['stock', ticker] : null,
     async () => {
       if (!ticker) return null;
       const response = await getStockStocksTickerGet({
@@ -47,10 +91,13 @@ export function useStock(ticker: string | null) {
       return response.data;
     },
     {
-      refreshInterval: 2000,
       revalidateOnFocus: false,
     }
   );
+
+  // Sync revalidation to wall clock
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate);
 
   return {
     stock: data,
@@ -63,7 +110,7 @@ export function useStock(ticker: string | null) {
 
 export function useStockSnapshots(ticker: string | null, limit = 100) {
   const { data, error, isLoading, mutate } = useSWR<StockSnapshotResponse[] | undefined>(
-    ticker ? `snapshots-${ticker}-${limit}` : null,
+    ticker ? ['snapshots', ticker, limit] : null,
     async () => {
       if (!ticker) return undefined;
       const response = await getStockSnapshotsStocksTickerSnapshotsGet({
@@ -73,10 +120,13 @@ export function useStockSnapshots(ticker: string | null, limit = 100) {
       return response.data;
     },
     {
-      refreshInterval: 5000,
       revalidateOnFocus: false,
     }
   );
+
+  // Sync revalidation to wall clock
+  const revalidate = useCallback(() => mutate(), [mutate]);
+  useSyncedRevalidation(revalidate);
 
   return {
     snapshots: data ?? [],
@@ -87,17 +137,190 @@ export function useStockSnapshots(ticker: string | null, limit = 100) {
   };
 }
 
+// Race data for performance race view
+export interface RaceDataPoint {
+  timestamp: string;
+  [ticker: string]: number | string; // ticker -> actual price
+}
+
+export interface RaceStock {
+  ticker: string;
+  title: string;
+  image: string | null;
+  color: string;
+  currentPrice: number;
+  percentChange: number;
+}
+
+const RACE_COLORS = [
+  '#22c55e', // green
+  '#3b82f6', // blue
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // violet
+];
+
+// Sync interval for race data - controls how often new random stocks are selected
+const RACE_SYNC_INTERVAL_MS = 35000;
+
+// Fisher-Yates shuffle
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+export function useRaceData(count = 5, snapshotLimit = 30) {
+  // Fetch all stocks, then randomly pick `count` for the race
+  const { stocks: allStocks } = useStocks();
+
+  // Store selected tickers separately - only changes when randomSeed changes
+  const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
+  const [randomSeed, setRandomSeed] = useState(() => Date.now());
+
+  // Update selected tickers only when randomSeed changes (not on websocket updates)
+  // Also run on initial load when we first get stocks
+  const hasInitializedRef = useRef(false);
+  useEffect(() => {
+    if (allStocks.length === 0) return;
+    // Only re-select on seed change, OR on first load
+    if (hasInitializedRef.current && selectedTickers.length > 0) return;
+    hasInitializedRef.current = true;
+    const shuffled = shuffleArray(allStocks);
+    const selected = shuffled.slice(0, count).map((s) => s.ticker);
+    setSelectedTickers(selected);
+  }, [randomSeed, count, allStocks.length, selectedTickers.length]);
+
+  // Get current stock data for selected tickers
+  const stocks = useMemo(() => {
+    if (selectedTickers.length === 0) return [];
+    return selectedTickers
+      .map((ticker) => allStocks.find((s) => s.ticker === ticker))
+      .filter((s): s is StockResponse => s !== undefined);
+  }, [allStocks, selectedTickers]);
+
+  const { data, error, isLoading, mutate } = useSWR(
+    stocks.length > 0 ? ['race-data', stocks.map((s) => s.ticker).join(','), snapshotLimit] : null,
+    async () => {
+      // Fetch snapshots for all stocks in parallel
+      const snapshotPromises = stocks.map((stock) =>
+        getStockSnapshotsStocksTickerSnapshotsGet({
+          path: { ticker: stock.ticker },
+          query: { limit: snapshotLimit },
+        })
+      );
+
+      const results = await Promise.all(snapshotPromises);
+      const allSnapshots = results.map((r) => r.data ?? []);
+
+      // Build race stocks with colors
+      const raceStocks: RaceStock[] = stocks.map((stock, i) => ({
+        ticker: stock.ticker,
+        title: stock.title,
+        image: stock.image,
+        color: RACE_COLORS[i % RACE_COLORS.length],
+        currentPrice: stock.price,
+        percentChange: stock.percent_change,
+      }));
+
+      // Find all unique timestamps and collect actual prices
+      const timestampMap = new Map<string, Record<string, number>>();
+
+      allSnapshots.forEach((snapshots, stockIndex) => {
+        const ticker = stocks[stockIndex].ticker;
+
+        snapshots.forEach((snapshot) => {
+          const ts = snapshot.created_at;
+          if (!timestampMap.has(ts)) {
+            timestampMap.set(ts, {});
+          }
+          // Use actual price instead of normalized
+          timestampMap.get(ts)![ticker] = snapshot.price;
+        });
+      });
+
+      // Sort by timestamp and build the data array
+      const sortedTimestamps = Array.from(timestampMap.keys()).sort();
+
+      // If we have more timestamps than snapshotLimit, sample evenly
+      let selectedTimestamps = sortedTimestamps;
+      if (sortedTimestamps.length > snapshotLimit) {
+        const step = sortedTimestamps.length / snapshotLimit;
+        selectedTimestamps = [];
+        for (let i = 0; i < snapshotLimit; i++) {
+          const idx = Math.floor(i * step);
+          selectedTimestamps.push(sortedTimestamps[idx]);
+        }
+      }
+
+      // Forward-fill missing values
+      const raceData: RaceDataPoint[] = [];
+      const lastValues: Record<string, number> = {};
+
+      // Pre-fill lastValues by iterating through all timestamps in order
+      sortedTimestamps.forEach((ts) => {
+        stocks.forEach((stock) => {
+          const value = timestampMap.get(ts)?.[stock.ticker];
+          if (value !== undefined) {
+            lastValues[stock.ticker] = value;
+          }
+        });
+
+        // Only add point if this timestamp is selected
+        if (selectedTimestamps.includes(ts)) {
+          const point: RaceDataPoint = {
+            timestamp: new Date(ts).toLocaleTimeString('de-DE', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          };
+
+          stocks.forEach((stock) => {
+            point[stock.ticker] = lastValues[stock.ticker] ?? stock.price;
+          });
+
+          raceData.push(point);
+        }
+      });
+
+      return { raceStocks, raceData };
+    },
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+  // Sync revalidation to wall clock (slower for race data)
+  // Also pick new random stocks on each revalidation
+  const revalidate = useCallback(() => {
+    setRandomSeed(Date.now());
+    mutate();
+  }, [mutate]);
+  useSyncedRevalidation(revalidate, RACE_SYNC_INTERVAL_MS);
+
+  return {
+    raceStocks: data?.raceStocks ?? [],
+    raceData: data?.raceData ?? [],
+    isLoading: isLoading || stocks.length === 0,
+    isError: !!error,
+    error,
+  };
+}
+
 // Swipe action helper (not a hook, but useful utility)
 export async function submitSwipe(
   ticker: string,
   direction: SwipeDirection,
-  swipeToken?: string | null
+  token?: string | null
 ) {
   const response = await swipeSwipePost({
-    body: {
+    query: {
       ticker,
       direction,
-      swipe_token: swipeToken,
+      token,
     },
   });
 

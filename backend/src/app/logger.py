@@ -85,6 +85,15 @@ def init_logging():
     logging.getLogger("uvicorn").handlers = [intercept_handler]
     logging.getLogger("uvicorn.access").handlers = [intercept_handler]
 
+    # Disable default logger
+    logging.getLogger("logging").handlers = []
+
+    # Disable SQLAlchemy logger
+    logging.getLogger("sqlalchemy").handlers = [intercept_handler]
+    logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
+    logging.getLogger("sqlalchemy.engine.Engine").handlers = [intercept_handler]
+    logging.getLogger("sqlalchemy.engine.Engine").setLevel(logging.ERROR)
+
     # set logs output, level and format
     _ = logger.configure(
         handlers=[{"sink": sys.stdout, "level": logging.DEBUG, "format": format_record}]  # pyright: ignore[reportArgumentType]

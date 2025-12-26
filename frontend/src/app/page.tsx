@@ -21,7 +21,7 @@ export default function Home() {
       title: 'Registrierungsstation',
       description:
         'Vor-Ort-Registrierung mit Spitznamen und Live-Fotoaufnahme. Werde eine neue Aktie auf dem Markt.',
-      href: '/admin/',
+      href: '/api/admin/',
       icon: <UserPlus className="h-10 w-10" />,
     },
     {
@@ -35,7 +35,7 @@ export default function Home() {
       title: 'Markt-Display',
       description:
         'Live-Visualisierung der Marktdaten. Umfasst Börsenticker, Marktkarten und ein Terminal im Bloomberg-Stil.',
-      href: '/display',
+      href: '/display/bloomberg',
       icon: <Presentation className="h-10 w-10" />,
     },
   ];
@@ -60,7 +60,7 @@ export default function Home() {
           <Link href={feature.href} key={feature.title} className="group">
             <Card className="h-full transform transition-all duration-300 ease-in-out group-hover:scale-105 group-hover:shadow-2xl group-hover:shadow-primary/20 group-hover:border-primary">
               <CardHeader className="flex flex-col items-center justify-center text-center">
-                <div className="mb-4 rounded-full bg-primary/10 p-4 text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
+                <div className="mb-4 bg-primary/10 p-4 text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
                   {feature.icon}
                 </div>
                 <CardTitle className="text-2xl font-headline">

@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 from enum import Enum
 from functools import partial
-from typing import override
+from typing import TypedDict, override
 from uuid import uuid4
 
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -33,6 +34,11 @@ class ImageType(str, Enum):
     WEBSITE = "website"
 
 
+class TaskParameters(TypedDict):
+    width: int
+    height: int
+
+
 def generate_uuid() -> str:
     return str(uuid4())
 
@@ -50,6 +56,10 @@ class AITask(SQLModel, table=True):
     prompt: str
     model: str
     image_type: ImageType | None = Field(default=None)
+    arguments: TaskParameters = Field(
+        default_factory=lambda: TaskParameters(width=0, height=0),
+        sa_column=Column(JSON),
+    )
 
     atlascloud_id: str | None = Field(default=None)
     result: str | None = Field(default=None)

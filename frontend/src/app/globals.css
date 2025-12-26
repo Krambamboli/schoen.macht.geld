@@ -4,58 +4,61 @@
 
 @layer base {
   :root {
-    --background: 255 43% 95%; /* #E6E0F7 */
-    --foreground: 285 5% 20%;
-    --card: 255 43% 99%;
-    --card-foreground: 285 5% 20%;
-    --popover: 255 43% 99%;
-    --popover-foreground: 285 5% 20%;
-    --primary: 285 80% 53%; /* #A020F0 */
-    --primary-foreground: 285 80% 98%;
-    --secondary: 255 30% 90%;
-    --secondary-foreground: 285 5% 30%;
-    --muted: 255 30% 90%;
-    --muted-foreground: 285 5% 45%;
-    --accent: 205 80% 53%; /* #20A0F0 */
-    --accent-foreground: 205 80% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 255 20% 88%;
-    --input: 255 20% 88%;
-    --ring: 285 80% 53%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    /* Bloomberg Light (inverted for light mode) */
+    --background: 0 0% 95%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 36 100% 45%; /* Orange */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 20%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 51 100% 45%; /* Gold */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 50% 30%;
+    --input: 0 0% 85%;
+    --ring: 36 100% 50%;
+    --radius: 0;
+    --chart-1: 36 100% 50%;
+    --chart-2: 51 100% 50%;
+    --chart-3: 120 100% 40%;
+    --chart-4: 0 100% 50%;
+    --chart-5: 200 80% 50%;
   }
 
   .dark {
-    --background: 285 5% 10%;
-    --foreground: 255 43% 95%;
-    --card: 285 5% 15%;
-    --card-foreground: 255 43% 95%;
-    --popover: 285 5% 10%;
-    --popover-foreground: 255 43% 95%;
-    --primary: 285 80% 63%;
-    --primary-foreground: 285 5% 15%;
-    --secondary: 285 5% 20%;
-    --secondary-foreground: 255 43% 95%;
-    --muted: 285 5% 20%;
-    --muted-foreground: 255 30% 70%;
-    --accent: 205 80% 63%;
-    --accent-foreground: 205 5% 15%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 285 5% 25%;
-    --input: 285 5% 25%;
-    --ring: 285 80% 63%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Bloomberg Terminal - Orange/Amber on Black */
+    --background: 0 0% 0%; /* Pure black */
+    --foreground: 36 100% 50%; /* Amber orange #FF9900 */
+    --card: 0 0% 5%;
+    --card-foreground: 36 100% 50%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 36 100% 50%;
+    --primary: 36 100% 50%; /* Orange #FF9900 */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 36 80% 60%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 36 50% 45%;
+    --accent: 51 100% 50%; /* Gold #FFCC00 */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 100% 50%; /* Bright red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 80% 25%; /* Orange-tinted border */
+    --input: 0 0% 15%;
+    --ring: 36 100% 50%;
+    /* Chart colors - financial palette */
+    --chart-1: 36 100% 50%; /* Orange */
+    --chart-2: 51 100% 50%; /* Gold */
+    --chart-3: 120 100% 45%; /* Green */
+    --chart-4: 0 100% 55%; /* Red */
+    --chart-5: 200 80% 55%; /* Blue */
   }
 }
 
@@ -66,4 +69,412 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* ALL CAPS for headers and labels */
+  h1, h2, h3, h4, h5, h6 {
+    @apply uppercase tracking-wide;
+  }
+  label, th, [role="columnheader"] {
+    @apply uppercase tracking-wider;
+  }
+
+  /* Visible borders for tables */
+  table {
+    @apply border border-border;
+  }
+  th, td {
+    @apply border border-border;
+  }
+
+  /* Sharp corners globally (backup for components not using --radius) */
+  *, *::before, *::after {
+    border-radius: 0 !important;
+  }
+}
+
+/* Bloomberg-style flash animation for value changes */
+@keyframes flash {
+  0% {
+    background-color: rgba(255, 255, 0, 0.8);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-flash {
+  animation: flash 500ms ease-out;
+}
+
+/* Performance Race dot animations */
+@keyframes race-dot-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes race-dot-ring {
+  0% {
+    r: 8;
+    opacity: 0.8;
+  }
+  100% {
+    r: 24;
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RETRO CRT EFFECTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Phosphor glow effect - adds subtle glow to text */
+.phosphor-glow {
+  text-shadow:
+    0 0 2px currentColor,
+    0 0 4px currentColor,
+    0 0 8px rgba(255, 153, 0, 0.3);
+}
+
+/* Apply phosphor glow to all text in dark mode */
+.dark body {
+  text-shadow: 0 0 1px currentColor;
+}
+
+/* Screen flicker animation */
+@keyframes screen-flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.95; }
+  94% { opacity: 1; }
+  97% { opacity: 0.98; }
+  98% { opacity: 1; }
+}
+
+.screen-flicker {
+  animation: screen-flicker 4s infinite;
+}
+
+/* Noise grain overlay */
+@keyframes noise-animation {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -5%); }
+  20% { transform: translate(-10%, 5%); }
+  30% { transform: translate(5%, -10%); }
+  40% { transform: translate(-5%, 15%); }
+  50% { transform: translate(-10%, 5%); }
+  60% { transform: translate(15%, 0); }
+  70% { transform: translate(0, 10%); }
+  80% { transform: translate(-15%, 0); }
+  90% { transform: translate(10%, 5%); }
+  100% { transform: translate(5%, 0); }
+}
+
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  right: -50%;
+  bottom: -50%;
+  width: 200%;
+  height: 200%;
+  background: transparent url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E") repeat;
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 9998;
+  animation: noise-animation 0.5s steps(10) infinite;
+}
+
+/* Interlacing / scanline effect */
+.interlace-overlay::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.15) 1px,
+    rgba(0, 0, 0, 0.15) 2px
+  );
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* Box-drawing border utilities */
+.box-border-single {
+  border: 1px solid hsl(var(--border));
+}
+
+.box-border-double {
+  border: 3px double hsl(var(--border));
+}
+
+/* Terminal-style blinking cursor */
+@keyframes blink-cursor {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.blink-cursor::after {
+  content: '█';
+  animation: blink-cursor 1s step-end infinite;
+  color: hsl(var(--primary));
+}
+
+/* LED glow effect for numbers/data */
+.led-glow {
+  text-shadow:
+    0 0 2px currentColor,
+    0 0 4px currentColor,
+    0 0 10px currentColor;
+}
+
+/* Alternating row backgrounds for tables */
+.alternating-rows tbody tr:nth-child(odd) {
+  background-color: rgba(255, 153, 0, 0.05);
+}
+
+.alternating-rows tbody tr:nth-child(even) {
+  background-color: transparent;
+}
+
+/* Inverse header style */
+.inverse-header thead {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.inverse-header th {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary-foreground) / 0.3);
+}
+
+/* Make table header text darker and more readable on orange background */
+thead th .text-muted-foreground,
+th .text-muted-foreground {
+  color: hsl(var(--primary-foreground)) !important;
+  opacity: 0.95;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KIOSK MODE - Larger text and elements for overhead displays
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.kiosk-mode {
+  /* Scale all base font sizes */
+  font-size: 1.5rem;
+}
+
+.kiosk-mode header {
+  padding: 1.5rem 2rem;
+}
+
+.kiosk-mode header .text-xl {
+  font-size: 2.5rem;
+}
+
+.kiosk-mode header .text-base {
+  font-size: 1.75rem;
+}
+
+.kiosk-mode header .h-8 {
+  height: 3rem;
+  width: 3rem;
+}
+
+/* View title bar */
+.kiosk-mode .text-xl {
+  font-size: 2rem;
+}
+
+/* Marquees */
+.kiosk-mode .h-8 {
+  height: 3.5rem;
+}
+
+.kiosk-mode .text-sm {
+  font-size: 1.25rem;
+}
+
+/* Status bar and footer */
+.kiosk-mode footer {
+  padding: 1rem 2rem;
+}
+
+/* F-key legend */
+.kiosk-mode .text-sm {
+  font-size: 1.125rem;
+}
+
+/* Main content scaling */
+.kiosk-mode main {
+  font-size: 1.25rem;
+}
+
+/* Tables */
+.kiosk-mode table {
+  font-size: 1.25rem;
+}
+
+.kiosk-mode th,
+.kiosk-mode td {
+  padding: 1rem 1.5rem;
+}
+
+.kiosk-mode th {
+  font-size: 1.5rem;
+  height: auto;
+  min-height: 3rem;
+}
+
+.kiosk-mode thead {
+  font-size: 1.5rem;
+}
+
+/* Buttons and interactive elements */
+.kiosk-mode button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.125rem;
+}
+
+/* Terminal and code-like displays */
+.kiosk-mode .font-mono {
+  font-size: 1.25rem;
+}
+
+/* Leaderboard ranks */
+.kiosk-mode .text-lg {
+  font-size: 2rem;
+}
+
+.kiosk-mode .text-2xl {
+  font-size: 3rem;
+}
+
+.kiosk-mode .text-3xl {
+  font-size: 4rem;
+}
+
+.kiosk-mode .text-4xl {
+  font-size: 5rem;
+}
+
+.kiosk-mode .text-5xl {
+  font-size: 6rem;
+}
+
+/* Stock prices and data */
+.kiosk-mode .tabular-nums {
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+/* Badges and labels */
+.kiosk-mode .text-xs {
+  font-size: 1rem;
+}
+
+/* Increase spacing */
+.kiosk-mode .gap-1 {
+  gap: 0.5rem;
+}
+
+.kiosk-mode .gap-2 {
+  gap: 0.75rem;
+}
+
+.kiosk-mode .gap-3 {
+  gap: 1rem;
+}
+
+.kiosk-mode .gap-4 {
+  gap: 1.5rem;
+}
+
+/* Chart elements */
+.kiosk-mode svg text {
+  font-size: 1.25rem;
+}
+
+/* Border thickness */
+.kiosk-mode .border,
+.kiosk-mode .border-t,
+.kiosk-mode .border-b,
+.kiosk-mode .border-l,
+.kiosk-mode .border-r {
+  border-width: 2px;
+}
+
+/* Panel padding */
+.kiosk-mode .p-2 {
+  padding: 1rem;
+}
+
+.kiosk-mode .p-3 {
+  padding: 1.25rem;
+}
+
+.kiosk-mode .p-4 {
+  padding: 1.5rem;
+}
+
+.kiosk-mode .px-4 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.kiosk-mode .py-2 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+/* Marquee text scaling - make text 2x larger */
+.h-8.flex.items-center {
+  font-size: 2rem;
+  height: 4rem;
+}
+
+.h-8.flex.items-center .text-sm {
+  font-size: 1.5rem;
+}
+
+.h-8.flex.items-center .text-xs {
+  font-size: 1.25rem;
+}
+
+/* Market map foreignObject content scaling */
+.kiosk-mode foreignObject {
+  /* Ensure foreignObject content inherits kiosk mode styling */
+  font-size: inherit;
+}
+
+.kiosk-mode foreignObject .text-xs {
+  font-size: 1.25rem !important;
+}
+
+.kiosk-mode foreignObject .text-sm {
+  font-size: 1.5rem !important;
+}
+
+.kiosk-mode foreignObject .text-base {
+  font-size: 1.75rem !important;
+}
+
+.kiosk-mode foreignObject .text-lg {
+  font-size: 2.25rem !important;
 }
