@@ -1,6 +1,7 @@
+// Copied from _archived/register/registration-client.tsx to make it active
 'use client';
 
-import { generateProfileDescription } from '@/ai/flows/generate-profile-descriptions';
+import { generateProfileDescription } from '../../ai/flows/generate-profile-descriptions';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -47,12 +48,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-/**
- * The client component for the registration kiosk and admin management.
- * It handles creating new stock profiles and provides an interface for
- * listing, editing, and deleting existing stocks.
- * @returns {JSX.Element} The rendered registration and admin component.
- */
 export default function RegistrationClient() {
   // Registration State
   const [nickname, setNickname] = useState('');
@@ -74,7 +69,6 @@ export default function RegistrationClient() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
-  // Helper: convert data URL to Blob
   function dataUrlToBlob(dataUrl: string): Blob {
     const [header, base64] = dataUrl.split(',');
     const mimeMatch = /data:(.*?);base64/.exec(header);
@@ -85,7 +79,6 @@ export default function RegistrationClient() {
     return new Blob([arr], { type: mime });
   }
 
-  // Backend StockResponse shape (subset used in UI)
   type BackendStock = {
     ticker: string;
     title: string;
@@ -94,7 +87,6 @@ export default function RegistrationClient() {
     percent_change?: number | null;
   };
 
-  // Fetch all stocks for the admin list from backend
   const fetchStocks = useCallback(async () => {
     try {
       setIsLoadingStocks(true);
@@ -116,9 +108,6 @@ export default function RegistrationClient() {
     fetchStocks();
   }, [fetchStocks]);
 
-  /**
-   * Stops all tracks of the current media stream to turn off the camera.
-   */
   const stopStream = useCallback(() => {
     setStream(currentStream => {
         if (currentStream) {
@@ -128,7 +117,6 @@ export default function RegistrationClient() {
     });
   }, []);
 
-  // On mount, get the list of available video devices.
   useEffect(() => {
     const getDevices = async () => {
       try {
@@ -136,7 +124,7 @@ export default function RegistrationClient() {
         const availableDevices = (
           await navigator.mediaDevices.enumerateDevices()
         ).filter((device) => device.kind === 'videoinput');
-        
+
         setDevices(availableDevices);
         if (availableDevices.length > 0) {
           const preferredDeviceId = localStorage.getItem('preferredCameraId');
@@ -161,7 +149,6 @@ export default function RegistrationClient() {
     };
   }, [stopStream]);
 
-  // Effect to handle starting and stopping the camera stream.
   useEffect(() => {
     if (selectedDeviceId && !photoDataUrl) {
       localStorage.setItem('preferredCameraId', selectedDeviceId);
@@ -189,7 +176,7 @@ export default function RegistrationClient() {
             }
         }
       }
-      
+
       getCameraStream();
 
       return () => {
@@ -206,9 +193,6 @@ export default function RegistrationClient() {
     }
   }, [selectedDeviceId, photoDataUrl, stopStream]);
 
-  /**
-   * Captures a frame from the video stream and saves it as a JPEG data URL.
-   */
   const handleTakePhoto = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
@@ -227,9 +211,6 @@ export default function RegistrationClient() {
     setPhotoDataUrl(null);
   };
 
-  /**
-   * Calls the Genkit AI flow to generate a profile description.
-   */
   const handleGenerateDescription = async () => {
     if (!nickname || !photoDataUrl) {
       toast({
@@ -262,9 +243,6 @@ export default function RegistrationClient() {
     }
   };
 
-  /**
-   * Finalizes the registration: send data to backend to create stock.
-   */
   const handleRegister = async () => {
     if (!nickname || !photoDataUrl || !description) {
       toast({
@@ -278,7 +256,6 @@ export default function RegistrationClient() {
     setIsRegistering(true);
 
     try {
-      // Build ticker: first 4 alphanumeric chars, padded
       const raw = nickname.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
       const ticker = (raw.substring(0, 4) || nickname.substring(0, 4).toUpperCase()).padEnd(4, 'X');
 
@@ -286,9 +263,6 @@ export default function RegistrationClient() {
       form.append('ticker', ticker);
       form.append('title', nickname);
       form.append('description', description);
-      // Optional initial price: if you want to set a base price (uses backend default if omitted)
-      // form.append('initial_price', String(100.0));
-      // Attach image as file
       const blob = dataUrlToBlob(photoDataUrl);
       const file = new File([blob], `${ticker}.jpg`, { type: blob.type });
       form.append('image', file);
@@ -308,18 +282,15 @@ export default function RegistrationClient() {
         throw new Error(`HTTP ${res.status} ${details}`);
       }
 
-      // Success
       toast({
         title: 'Registrierung erfolgreich!',
         description: `${nickname} wird jetzt an der Schön. Macht. Geld. Börse gehandelt.`,
       });
 
-      // Reset form
       setNickname('');
       setPhotoDataUrl(null);
       setDescription('');
 
-      // Refresh admin list
       fetchStocks();
     } catch (e: any) {
       console.error('Registrierung fehlgeschlagen:', e);
@@ -332,12 +303,7 @@ export default function RegistrationClient() {
       setIsRegistering(false);
     }
   };
-  
-  /**
-   * Handles deletion via backend.
-   * Note: Backend currently has no DELETE /stocks/{ticker}; if needed, implement there.
-   * For now, we disable deletion action or could set is_active=false via a price update or admin route.
-   */
+
   const handleDelete = async (ticker: string) => {
     toast({
       title: 'Löschen nicht verfügbar',
@@ -345,12 +311,10 @@ export default function RegistrationClient() {
     });
   };
 
-  // Open CMS (Admin Panel) to manage stocks
   const openCMS = (ticker?: string) => {
     const baseUrl = typeof window !== 'undefined'
       ? (process.env.NEXT_PUBLIC_API_URL || '/api')
       : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
-    // Generic admin panel link; you can navigate to Stocks inside
     const url = `${baseUrl}/admin`;
     window.open(url, '_blank');
   };
@@ -365,7 +329,6 @@ export default function RegistrationClient() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Left Column: Camera and Nickname */}
           <div className="space-y-4">
             <div>
               <Label htmlFor="nickname" className="flex items-center gap-2 mb-2">
@@ -444,7 +407,6 @@ export default function RegistrationClient() {
             </div>
           </div>
 
-          {/* Right Column: Description */}
           <div className="space-y-4 flex flex-col">
             <Label
               htmlFor="description"
@@ -485,8 +447,7 @@ export default function RegistrationClient() {
           </Button>
         </CardFooter>
       </Card>
-      
-      {/* Admin Section */}
+
       <div className="mt-12">
         <Separator />
         <div className="mt-8">
@@ -513,7 +474,6 @@ export default function RegistrationClient() {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingStock(stock)}>
                             <Edit className="h-4 w-4" />
                         </Button>
-                        {/* Replace delete with link to CMS */}
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openCMS(stock.ticker)} title="Im CMS löschen">
                           <Trash2 className="h-4 w-4" />
                         </Button>
