@@ -33,11 +33,6 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
-import { deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { Stock } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { EditStockDialog } from './edit-stock-dialog';
 import {
@@ -71,24 +66,55 @@ export default function RegistrationClient() {
   const [isRegistering, setIsRegistering] = useState(false);
 
   // Admin State
-  const [editingStock, setEditingStock] = useState<Stock | null>(null);
+  const [editingStock, setEditingStock] = useState<any | null>(null);
+  const [stocks, setStocks] = useState<BackendStock[]>([]);
+  const [isLoadingStocks, setIsLoadingStocks] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
-  const { firestore, auth, user, isUserLoading } = useFirebase();
 
-  // Fetch all stocks for the admin list
-  const titlesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'titles') : null, [firestore]);
-  const { data: stocks } = useCollection<Stock>(titlesCollection);
-  const sortedStocks = stocks ? [...stocks].sort((a, b) => a.nickname.localeCompare(b.nickname)) : [];
+  // Helper: convert data URL to Blob
+  function dataUrlToBlob(dataUrl: string): Blob {
+    const [header, base64] = dataUrl.split(',');
+    const mimeMatch = /data:(.*?);base64/.exec(header);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bytes = atob(base64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
 
-  // On mount, if the user is not authenticated, initiate an anonymous sign-in.
-  useEffect(() => {
-    if (!isUserLoading && !user && auth) {
-      initiateAnonymousSignIn(auth);
+  // Backend StockResponse shape (subset used in UI)
+  type BackendStock = {
+    ticker: string;
+    title: string;
+    description: string;
+    price: number;
+    percent_change?: number | null;
+  };
+
+  // Fetch all stocks for the admin list from backend
+  const fetchStocks = useCallback(async () => {
+    try {
+      setIsLoadingStocks(true);
+      const baseUrl = typeof window !== 'undefined'
+        ? (process.env.NEXT_PUBLIC_API_URL || '/api')
+        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+      const res = await fetch(`${baseUrl}/stocks/`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: BackendStock[] = await res.json();
+      setStocks(data);
+    } catch (e) {
+      console.error('Fehler beim Laden der Titel:', e);
+    } finally {
+      setIsLoadingStocks(false);
     }
-  }, [isUserLoading, user, auth]);
+  }, []);
+
+  useEffect(() => {
+    fetchStocks();
+  }, [fetchStocks]);
 
   /**
    * Stops all tracks of the current media stream to turn off the camera.
@@ -237,70 +263,96 @@ export default function RegistrationClient() {
   };
 
   /**
-   * Finalizes the registration, creating a new `Stock` object and saving it to Firestore.
+   * Finalizes the registration: send data to backend to create stock.
    */
-  const handleRegister = () => {
-    if (!firestore || !user) {
-       toast({ variant: 'destructive', title: 'Datenbank nicht bereit', description: 'Bitte warte einen Moment und versuche es erneut.' });
-       return;
-    }
+  const handleRegister = async () => {
     if (!nickname || !photoDataUrl || !description) {
-       toast({
+      toast({
         variant: 'destructive',
         title: 'Registrierung unvollständig',
         description: 'Bitte fülle alle Felder aus, bevor du dich registrierst.',
       });
       return;
     }
-    
+
     setIsRegistering(true);
-    
-    const initialValue = 100.0;
-    const docId = Date.now().toString();
 
-    const newStock: Stock = {
-      id: docId,
-      ticker: nickname.substring(0, 4).toUpperCase().padEnd(4, 'X'),
-      nickname,
-      photoUrl: photoDataUrl,
-      description,
-      currentValue: initialValue,
-      initialValue: initialValue,
-      change: 0,
-      percentChange: 0,
-      valueChangeLastMinute: 0,
-      valueChangeLast5Minutes: 0,
-      percentChangeLast5Minutes: 0,
-      history: [{ value: initialValue, timestamp: new Date().toISOString() }],
-    };
-    
-    const docRef = doc(firestore, 'titles', docId);
-    setDocumentNonBlocking(docRef, newStock, {});
+    try {
+      // Build ticker: first 4 alphanumeric chars, padded
+      const raw = nickname.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const ticker = (raw.substring(0, 4) || nickname.substring(0, 4).toUpperCase()).padEnd(4, 'X');
 
-    setTimeout(() => {
+      const form = new FormData();
+      form.append('ticker', ticker);
+      form.append('title', nickname);
+      form.append('description', description);
+      // Optional initial price: if you want to set a base price (uses backend default if omitted)
+      // form.append('initial_price', String(100.0));
+      // Attach image as file
+      const blob = dataUrlToBlob(photoDataUrl);
+      const file = new File([blob], `${ticker}.jpg`, { type: blob.type });
+      form.append('image', file);
+
+      const baseUrl = typeof window !== 'undefined'
+        ? (process.env.NEXT_PUBLIC_API_URL || '/api')
+        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+
+      const res = await fetch(`${baseUrl}/stocks/`, {
+        method: 'POST',
+        body: form,
+      });
+
+      if (!res.ok) {
+        let details = '';
+        try { details = await res.text(); } catch {}
+        throw new Error(`HTTP ${res.status} ${details}`);
+      }
+
+      // Success
       toast({
         title: 'Registrierung erfolgreich!',
         description: `${nickname} wird jetzt an der Schön. Macht. Geld. Börse gehandelt.`,
       });
+
+      // Reset form
       setNickname('');
       setPhotoDataUrl(null);
       setDescription('');
+
+      // Refresh admin list
+      fetchStocks();
+    } catch (e: any) {
+      console.error('Registrierung fehlgeschlagen:', e);
+      toast({
+        variant: 'destructive',
+        title: 'Registrierung fehlgeschlagen',
+        description: 'Bitte versuche es erneut. ' + (e?.message || ''),
+      });
+    } finally {
       setIsRegistering(false);
-    }, 1500);
+    }
   };
   
   /**
-   * Handles the deletion of a stock from the admin interface.
-   * @param {string} stockId - The ID of the stock to delete.
+   * Handles deletion via backend.
+   * Note: Backend currently has no DELETE /stocks/{ticker}; if needed, implement there.
+   * For now, we disable deletion action or could set is_active=false via a price update or admin route.
    */
-  const handleDelete = (stockId: string) => {
-    if (!firestore) return;
-    const docRef = doc(firestore, 'titles', stockId);
-    deleteDocumentNonBlocking(docRef);
+  const handleDelete = async (ticker: string) => {
     toast({
-      title: 'Titel gelöscht',
-      description: 'Der Titel wurde erfolgreich vom Markt entfernt.',
+      title: 'Löschen nicht verfügbar',
+      description: 'Das Backend bietet derzeit keinen Endpunkt zum Löschen von Titeln.',
     });
+  };
+
+  // Open CMS (Admin Panel) to manage stocks
+  const openCMS = (ticker?: string) => {
+    const baseUrl = typeof window !== 'undefined'
+      ? (process.env.NEXT_PUBLIC_API_URL || '/api')
+      : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+    // Generic admin panel link; you can navigate to Stocks inside
+    const url = `${baseUrl}/admin`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -426,7 +478,7 @@ export default function RegistrationClient() {
             size="lg"
             className="w-full"
             onClick={handleRegister}
-            disabled={!nickname || !photoDataUrl || !description || isRegistering || isUserLoading || !user}
+            disabled={!nickname || !photoDataUrl || !description || isRegistering}
           >
             {isRegistering && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Deine Aktie registrieren
@@ -447,38 +499,24 @@ export default function RegistrationClient() {
                 <span className='text-right'>Aktionen</span>
             </div>
             <div className='max-h-96 overflow-y-auto'>
-              {sortedStocks.map(stock => (
-                 <div key={stock.id} className="grid grid-cols-[1fr_80px] md:grid-cols-[1fr_120px_100px_80px] items-center gap-3 p-2 border-b last:border-b-0">
-                    <span className="font-semibold truncate pl-2">{stock.nickname}</span>
-                    <span className='text-right hidden md:inline font-mono'>{stock.currentValue.toFixed(2)}</span>
-                    <span className={`text-right hidden md:inline font-mono ${stock.percentChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {stock.percentChange.toFixed(2)}%
+              {isLoadingStocks && (
+                <div className="p-4 text-sm text-muted-foreground">Lade Daten…</div>
+              )}
+              {stocks.map(stock => (
+                 <div key={stock.ticker} className="grid grid-cols-[1fr_80px] md:grid-cols-[1fr_120px_100px_80px] items-center gap-3 p-2 border-b last:border-b-0">
+                    <span className="font-semibold truncate pl-2">{stock.title}</span>
+                    <span className='text-right hidden md:inline font-mono'>{stock.price.toFixed(2)}</span>
+                    <span className={`text-right hidden md:inline font-mono ${(stock.percent_change ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {(stock.percent_change ?? 0).toFixed(2)}%
                     </span>
                     <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingStock(stock)}>
                             <Edit className="h-4 w-4" />
                         </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Bist du dir absolut sicher?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Diese Aktion kann nicht rückgängig gemacht werden. Dadurch wird der Titel "{stock.nickname}" dauerhaft gelöscht.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(stock.id)}>
-                                Löschen
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {/* Replace delete with link to CMS */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openCMS(stock.ticker)} title="Im CMS löschen">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                     </div>
                  </div>
               ))}
