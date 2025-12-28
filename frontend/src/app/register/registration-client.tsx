@@ -120,10 +120,13 @@ export default function RegistrationClient() {
   useEffect(() => {
     const getDevices = async () => {
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
+        const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const availableDevices = (
           await navigator.mediaDevices.enumerateDevices()
         ).filter((device) => device.kind === 'videoinput');
+
+        // Stop the initial stream to release the camera lock
+        initialStream.getTracks().forEach((track) => track.stop());
 
         setDevices(availableDevices);
         if (availableDevices.length > 0) {
@@ -233,7 +236,7 @@ export default function RegistrationClient() {
       toast({
         variant: 'destructive',
         title: 'KI-Generierung fehlgeschlagen',
-        description: 'Konnte keine Beschreibung generieren. Bitte versuche es erneut.',
+        description: err instanceof Error ? err.message : 'Konnte keine Beschreibung generieren. Bitte versuche es erneut.',
       });
       setDescription(
         'Die KI macht gerade Kaffeepause. Bitte schreib deine eigene fabelhafte Beschreibung.'
