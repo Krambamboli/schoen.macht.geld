@@ -21,7 +21,7 @@ type AITaskCreateResponse = {
 
 type AITaskResponse = {
   id: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
   result?: string | null;
 };
 
@@ -42,7 +42,7 @@ export async function generateProfileDescription(
       ticker: ticker || null,
       title: nickname,
       description: null,
-      model: model || null,
+      model: model || undefined,
     }),
   });
   if (!createRes.ok) {
@@ -63,11 +63,11 @@ export async function generateProfileDescription(
     const statusRes = await fetch(`${baseUrl}/ai/tasks/${taskId}`);
     if (!statusRes.ok) break;
     const task: AITaskResponse = await statusRes.json();
-    if (task.status === 'COMPLETED') {
+    if (task.status === 'completed') {
       description = (task.result || '') as string;
       break;
     }
-    if (task.status === 'FAILED') {
+    if (task.status === 'failed') {
       throw new Error('KI-Generierung fehlgeschlagen (Backend-Task).');
     }
     await new Promise(r => setTimeout(r, pollIntervalMs));

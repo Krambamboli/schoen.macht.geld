@@ -1,5 +1,6 @@
 """Unified AI client with automatic fallback between providers."""
 
+import os
 from loguru import logger
 
 from app.config import settings
@@ -43,17 +44,22 @@ class AIClient:
         if not settings.force_google_ai and settings.atlascloud_api_key:
             try:
                 result = await atlascloud.generate_text(prompt, max_tokens, model)
-                logger.debug("Text generated via AtlasCloud")
+                logger.info("Text generated via AtlasCloud (Success)")
                 return result
             except AtlasCloudError as e:
                 errors.append(f"AtlasCloud: {e}")
                 logger.warning("AtlasCloud failed, trying fallback: {}", e)
+        elif settings.force_google_ai:
+            logger.info("AtlasCloud skipped (FORCE_GOOGLE_AI is true)")
+        elif not settings.atlascloud_api_key:
+            logger.debug("AtlasCloud skipped (No API Key configured)")
 
         # Fallback to Google AI
-        if settings.google_ai_api_key:
+        if settings.google_ai_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_API_KEY"):
             try:
+                logger.info(f"Attempting Google AI generation with model: {model or 'default'}")
                 result = await google_ai.generate_text(prompt, model)
-                logger.debug("Text generated via Google AI (fallback)")
+                logger.info(f"Text generated via Google AI (Success) Model={model}")
                 return result
             except GoogleAIError as e:
                 errors.append(f"Google AI: {e}")
@@ -195,15 +201,15 @@ class AIClient:
 
     def is_configured(self) -> bool:
         """Check if at least one AI provider is configured."""
-        return bool(settings.atlascloud_api_key or settings.google_ai_api_key)
+        return bool(settings.atlascloud_api_key or settings.google_ai_api_key or os.getenv("GOOGLE_API_KEY"))
 
     def text_provider(self) -> str | None:
         """Return which provider will be used for text generation."""
-        if settings.force_google_ai and settings.google_ai_api_key:
+        if settings.force_google_ai and (settings.google_ai_api_key or os.getenv("GOOGLE_API_KEY")):
             return "google"
         if settings.atlascloud_api_key:
             return "atlascloud"
-        if settings.google_ai_api_key:
+        if settings.google_ai_api_key or os.getenv("GOOGLE_API_KEY"):
             return "google"
         return None
 
